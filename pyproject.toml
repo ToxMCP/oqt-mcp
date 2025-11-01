@@ -3,7 +3,7 @@ name = "o-qt-mcp-server"
 version = "0.1.0"
 description = "Model Context Protocol (MCP) Server for the O-QT OECD QSAR Toolbox"
 readme = "README.md"
-license = "MIT"
+license = "Apache-2.0"
 authors = [
     { name = "O-QT Team", email = "oss@senseibelbi.dev" }
 ]

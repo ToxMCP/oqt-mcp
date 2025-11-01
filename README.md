@@ -218,6 +218,6 @@ Community feedback and pull requests are welcome—see [CONTRIBUTING.md](CONTRIB
 
 ## License
 
-This project is released under the [MIT License](LICENSE).  
+This project is released under the [Apache License 2.0](LICENSE).  
 
 _OECD QSAR Toolbox is proprietary software. Users must supply their own licensed installations and comply with the OECD EULA._
