@@ -320,7 +320,7 @@
         "description": "Polish Docker packaging, environment configuration, and end-user documentation for the MCP server.",
         "details": "- Review Dockerfile for best practices (multi-stage build, healthcheck, non-root enforcement) and add docker-compose sample connecting to QSAR API.\n- Document environment variables, security toggles, and deployment steps in README plus reference docs.\n- Provide quickstart guide for the O-QT assistant to integrate with the MCP endpoint.\n- Add CHANGELOG or release notes template for versioning strategy.",
         "testStrategy": "- Build Docker image locally to confirm runtime.\n- Smoke test the container using sample requests to `/health` and `/mcp`.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "6"
         ],
@@ -340,7 +340,7 @@
             "title": "Provide docker-compose sample",
             "description": "Create compose file wiring MCP server to mocked Toolbox API (or configurable endpoint) for local development.",
             "details": "- Include environment variable definitions and volume mounts for `.env`.\n- Document how to swap mock service for real Toolbox WebAPI instance.\n- Ensure compose setup works with `poetry run` workflows.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 7
           },
@@ -349,7 +349,7 @@
             "title": "Document deployment & configuration",
             "description": "Expand README with deployment steps, environment variable table, and security hardening checklist.",
             "details": "- Provide instructions for running behind reverse proxy with TLS termination.\n- Detail required secrets (OIDC, QSAR API creds) and how to inject them securely.\n- Include troubleshooting guide for common deployment issues (missing JWKS, QSAR downtime).",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 7
           },
@@ -358,7 +358,7 @@
             "title": "Establish release management artifacts",
             "description": "Create CHANGELOG template and outline semantic versioning workflow for MCP server releases.",
             "details": "- Add `CHANGELOG.md` seeded with initial release notes.\n- Document tagging strategy and GitHub release process.\n- Provide checklist for pre-release validation (tests, security review, documentation updated).",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 7
           }
@@ -411,12 +411,89 @@
             "parentTaskId": 8
           }
         ]
+      },
+      {
+        "id": 9,
+        "title": "Stabilize pytest import path",
+        "description": "Ensure pytest runs consistently when invoked as `poetry run pytest` by fixing import path configuration. Introduce a `tests/conftest.py` (or similar hook) that appends the repository root or `src/` directory to `sys.path`, or adjust packaging so `src.*` is importable. Verify `poetry run pytest tests/auth -q` works without ModuleNotFoundError, and update testing docs if guidance changes.",
+        "details": "- Add `tests/conftest.py` that inserts the project root on `sys.path`, or switch the project to package mode to make `src` importable.\n- Run `poetry run pytest tests/auth -q` and `poetry run python -m pytest` to confirm both succeed.\n- Update `docs/testing.md` with the recommended commands.\n- Ensure no new warnings or regressions are introduced.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Migrate pyproject metadata to PEP 621",
+        "description": "Update pyproject.toml to use the modern PEP 621 `[project]` table, eliminating deprecation warnings from `poetry check`. Ensure metadata (name, version, description, authors, readme, license) migrates cleanly and Poetry continues to build/install the project.",
+        "details": "- Move metadata from `[tool.poetry]` into `[project]` keys (`name`, `version`, `description`, `authors`, `readme`, `license`, etc.).\n- Keep Poetry-specific settings under `[tool.poetry]` only for extras build configuration that lacks PEP 621 support.\n- Run `poetry check` to confirm warnings are resolved.\n- Verify `poetry install` and running tests still succeed.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Adopt FastAPI lifespan API",
+        "description": "Refactor `src/api/server.py` to replace deprecated `@app.on_event` lifecycle handlers with the modern FastAPI lifespan context manager. Preserve existing startup validation (OIDC config checks, QSAR URL warning) and ensure tests still pass without deprecation warnings.",
+        "details": "- Replace the `@app.on_event(\"startup\")` function with a lifespan context (`lifespan` parameter or asynccontextmanager) while keeping the same logging and configuration validation.\n- Confirm the application still sets warnings when BYPASS_AUTH is enabled or QSAR URL is local.\n- Run `poetry run python -m pytest` and ensure the FastAPI deprecation warning no longer appears.\n- Update docs if references to on_event exist.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Expose Toolbox discovery tools via MCP",
+        "description": "Add MCP tools for ad-hoc discovery against the OECD QSAR Toolbox WebAPI. Provide endpoints so agents can list profilers, simulators, calculators, endpoint tree nodes, and QSAR model catalogs without running the full workflow.",
+        "details": "- Extend `src/tools/implementations/o_qt_qsar_tools.py` (or a new module) with functions that wrap existing client methods for: list profilers, list simulators, fetch endpoint tree, fetch calculators, retrieve QSAR catalog metadata.\n- Register the new discovery tools in the MCP tool registry with clear input/output schemas.\n- Ensure responses include enough metadata (GUID, caption, donor, type) for downstream selection.\n- Wire RBAC so read-only roles can access discovery tools.\n- Add unit tests mocking the QSAR client to validate tool responses and error handling.\n- Document the new tools in README and the integration guide.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "Expose granular Toolbox execution tools",
+        "description": "Provide MCP tools that allow agents to run individual QSAR models, profilers, and metabolism simulators without invoking the full O-QT workflow.",
+        "details": "- Add tool implementations that accept explicit GUIDs (qsarGuid, chemId, profilerGuid, simulatorGuid) and forward the call to the QSAR client wrappers.\n- Return structured JSON responses identical to the Toolbox WebAPI payload plus useful metadata (execution time, domain status, truncation notes).\n- Surface domain checks and errors as MCP error codes when applicable.\n- Update RBAC matrix so only authorized roles can invoke write/execute tools.\n- Write targeted unit tests using mocked QSAR responses to cover success and failure paths.\n- Document example requests/responses in README and integration guide.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Add PDF regeneration tool",
+        "description": "Expose a lightweight MCP tool that takes a stored log bundle and regenerates the regulatory PDF without rerunning the entire workflow.",
+        "details": "- Create a tool implementation (e.g., `render_pdf_from_log`) that accepts the comprehensive log JSON and optional branding options, calls `generate_pdf_report`, and returns a base64-encoded PDF.\n- Validate inputs and report errors for malformed logs.\n- Update RBAC so read roles can call the tool when audit logs are available.\n- Add unit tests to confirm PDF bytes are produced given fixture logs.\n- Document usage in README and integration guide.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Add unit tests for legacy Toolbox MCP tools",
+        "description": "Ensure the original O-QT QSAR MCP tool implementations are exercised by unit tests so that regressions are caught when agents use them.",
+        "details": "- Create targeted tests for get_public_qsar_model_info, search_chemicals, run_qsar_prediction, analyze_chemical_hazard, and generate_metabolites.\n- Reuse monkeypatching to stub qsar_client interactions and validate output payloads.\n- Run the test suite to confirm coverage across discovery, execution, and legacy tool modules.\n- Document results in the pull request summary if the test matrix changes.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-10-30T13:37:46.567Z",
       "description": "Default tasks context",
-      "updated": "2025-11-01T08:20:20.820Z"
+      "updated": "2025-11-01T15:35:06.312Z"
     }
   }
 }
