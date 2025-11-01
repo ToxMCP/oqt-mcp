@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import io
 
 import pytest
 
@@ -47,3 +49,14 @@ def test_canonicalize_structure(monkeypatch):
 
     result = asyncio.run(execution.canonicalize_structure("[CH3]"))
     assert result["canonical"] == "C"
+
+
+def test_render_pdf_from_log(monkeypatch):
+    fake_pdf = io.BytesIO(b"%PDF-1.4\n")
+
+    monkeypatch.setattr(execution, "generate_pdf_report", lambda log: fake_pdf)
+
+    result = asyncio.run(execution.render_pdf_from_log({"foo": "bar"}))
+    assert result["size_bytes"] == len(b"%PDF-1.4\n")
+    decoded = base64.b64decode(result["pdf_base64"])
+    assert decoded == b"%PDF-1.4\n"

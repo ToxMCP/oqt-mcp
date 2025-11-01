@@ -14,7 +14,8 @@
     "list_all_qsar_models",
     "canonicalize_structure",
     "structure_connectivity",
-    "list_search_databases"
+    "list_search_databases",
+    "render_pdf_from_log"
   ],
   "RESEARCHER": [
     "get_public_qsar_model_info",
@@ -42,7 +43,8 @@
     "group_chemicals_by_profiler",
     "canonicalize_structure",
     "structure_connectivity",
-    "list_search_databases"
+    "list_search_databases",
+    "render_pdf_from_log"
   ],
   "LAB_ADMIN": [
     "get_public_qsar_model_info",
@@ -71,7 +73,8 @@
     "group_chemicals_by_profiler",
     "canonicalize_structure",
     "structure_connectivity",
-    "list_search_databases"
+    "list_search_databases",
+    "render_pdf_from_log"
   ],
   "SYSTEM_BYPASS": [
     "get_public_qsar_model_info",
@@ -100,6 +103,7 @@
     "group_chemicals_by_profiler",
     "canonicalize_structure",
     "structure_connectivity",
-    "list_search_databases"
+    "list_search_databases",
+    "render_pdf_from_log"
   ]
 }

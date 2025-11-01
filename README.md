@@ -104,6 +104,7 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `group_chemicals_by_profiler` | Builds read-across groups for a chemId using a profiler GUID. |
 | `canonicalize_structure` | Returns the canonical SMILES for a structure. |
 | `structure_connectivity` | Returns the connectivity string for the supplied SMILES. |
+| `render_pdf_from_log` | Generates the regulatory PDF from a stored comprehensive log (no rerun). |
 
 ### `run_qsar_workflow` parameters
 

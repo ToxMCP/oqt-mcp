@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Optional
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from src.qsar import QsarClientError, qsar_client
 from src.tools.registry import tool_registry
+from src.utils.pdf_generator import generate_pdf_report
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +77,16 @@ class GroupingParams(BaseModel):
 
 class StructureParams(BaseModel):
     smiles: str = Field(..., description="SMILES string to process.")
+
+
+class PdfFromLogParams(BaseModel):
+    log: dict = Field(
+        ..., description="Comprehensive log bundle captured from a prior workflow run."
+    )
+    filename: Optional[str] = Field(
+        None,
+        description="Optional filename hint for downstream consumers (not used server-side).",
+    )
 
 
 async def run_qsar_model(qsar_guid: str, chem_id: str) -> dict:
@@ -204,6 +216,28 @@ async def structure_connectivity(smiles: str) -> dict:
     return {"smiles": smiles, "connectivity": payload}
 
 
+async def render_pdf_from_log(log: dict, filename: Optional[str] = None) -> dict:
+    try:
+        pdf_payload = generate_pdf_report(log)
+    except Exception as exc:  # pragma: no cover - passthrough to caller
+        log.error("PDF generation from log failed: %s", exc)
+        raise
+
+    if hasattr(pdf_payload, "getvalue"):
+        pdf_bytes = pdf_payload.getvalue()
+    elif isinstance(pdf_payload, (bytes, bytearray, memoryview)):
+        pdf_bytes = bytes(pdf_payload)
+    else:  # pragma: no cover - safeguard
+        raise TypeError("Unexpected payload produced by generate_pdf_report")
+
+    encoded = base64.b64encode(pdf_bytes).decode("utf-8")
+    return {
+        "pdf_base64": encoded,
+        "size_bytes": len(pdf_bytes),
+        "filename": filename or "oqt_report.pdf",
+    }
+
+
 def register_execution_tools() -> None:
     tool_registry.register(
         name="run_qsar_model",
@@ -273,6 +307,13 @@ def register_execution_tools() -> None:
         description="Returns the connectivity string for the supplied SMILES.",
         parameters_model=StructureParams,
         implementation=structure_connectivity,
+    )
+
+    tool_registry.register(
+        name="render_pdf_from_log",
+        description="Regenerates the regulatory PDF report from a stored log bundle (no Toolbox rerun).",
+        parameters_model=PdfFromLogParams,
+        implementation=render_pdf_from_log,
     )
 
 
