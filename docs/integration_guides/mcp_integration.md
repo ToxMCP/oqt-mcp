@@ -104,7 +104,8 @@ gemini mcp call oqt-mcp run_qsar_workflow --identifier "Acetone"
 
 1. After adding the provider, list tools (`tools.list` call).
 2. Invoke `server.ping` or `server.getStatus` (depending on host implementation) to confirm connectivity.
-3. Run a small workflow (e.g., `run_qsar_workflow` with a simple identifier) and verify the JSON response plus generated PDF.
+3. Run discovery calls such as `list_profilers`, `list_simulators`, or `list_qsar_models` to verify Toolbox connectivity.
+4. Trigger the full workflow (`run_qsar_workflow`) with a simple identifier and verify the JSON response plus generated PDF.
 
 ## Frequently Asked Questions
 

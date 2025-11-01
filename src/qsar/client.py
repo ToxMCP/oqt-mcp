@@ -83,6 +83,33 @@ class QsarClient:
         encoded = quote(object_guid)
         return await self._get(f"/api/v6/about/object/{encoded}")
 
+    async def list_calculators(self) -> Any:
+        return await self._get("/api/v6/calculation")
+
+    async def get_calculator_info(self, calculator_guid: str) -> Any:
+        encoded = quote(calculator_guid)
+        return await self._get(f"/api/v6/calculation/{encoded}/info")
+
+    async def list_profilers(self) -> Any:
+        return await self._get("/api/v6/profiling")
+
+    async def get_profiler_info(self, profiler_guid: str) -> Any:
+        encoded = quote(profiler_guid)
+        return await self._get(f"/api/v6/profiling/{encoded}/info")
+
+    async def list_simulators(self) -> Any:
+        return await self._get("/api/v6/metabolism")
+
+    async def get_simulator_info(self, simulator_guid: str) -> Any:
+        encoded = quote(simulator_guid)
+        return await self._get(f"/api/v6/metabolism/{encoded}/info")
+
+    async def get_endpoint_tree(self) -> Any:
+        return await self._get("/api/v6/data/endpointtree")
+
+    async def get_metadata_hierarchy(self) -> Any:
+        return await self._get("/api/v6/data/metadatahierarchy")
+
     async def search_chemicals(
         self, query: str, search_type: str = "auto", ignore_stereo: bool = False
     ) -> Dict[str, Any]:
@@ -106,6 +133,46 @@ class QsarClient:
     async def run_prediction(self, smiles: str, model_id: str) -> Dict[str, Any]:
         payload = {"smiles": smiles, "modelId": model_id}
         return await self._post("/api/v6/qsar/apply", json=payload)
+
+    async def list_qsar_models(self, position: str) -> Any:
+        encoded = quote(position, safe="")
+        return await self._get(f"/api/v6/qsar/list/{encoded}")
+
+    async def list_all_qsar_models(self) -> list[Dict[str, Any]]:
+        catalog: list[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        try:
+            positions = await self.get_endpoint_tree()
+        except QsarClientError:
+            positions = []
+
+        if not isinstance(positions, list):
+            positions = []
+
+        for position in positions:
+            if not isinstance(position, str):
+                continue
+            try:
+                models = await self.list_qsar_models(position) or []
+            except QsarClientError:
+                continue
+
+            if isinstance(models, dict):
+                models = [models]
+
+            for entry in models:
+                if not isinstance(entry, dict):
+                    continue
+                guid = entry.get("Guid")
+                if not guid or guid in seen:
+                    continue
+                seen.add(guid)
+                record = dict(entry)
+                record.setdefault("RequestedPosition", position)
+                catalog.append(record)
+
+        return catalog
 
     async def get_applicability_domain(
         self, model_id: str, chem_id: str

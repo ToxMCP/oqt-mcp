@@ -83,6 +83,16 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | Tool | Description |
 | --- | --- |
 | `run_qsar_workflow` | Executes the full QSAR assistant pipeline, returning structured JSON results, Markdown narrative, and a PDF report. |
+| `list_profilers` | Lists profilers configured inside the OECD QSAR Toolbox. |
+| `get_profiler_info` | Provides metadata, categories, and literature links for a specific profiler. |
+| `list_simulators` | Lists metabolism simulators (e.g., liver, skin, microbial). |
+| `get_simulator_info` | Provides detailed information for a simulator GUID. |
+| `list_calculators` | Lists calculator modules for physicochemical property estimation. |
+| `get_calculator_info` | Returns description, units, and notes for a calculator. |
+| `get_endpoint_tree` | Returns the endpoint taxonomy used to organise profilers and models. |
+| `get_metadata_hierarchy` | Returns the metadata hierarchy useful for filtering experimental data. |
+| `list_qsar_models` | Lists QSAR models for a specific endpoint tree position. |
+| `list_all_qsar_models` | Enumerates the full QSAR catalog across the endpoint tree (deduplicated). |
 
 ### `run_qsar_workflow` parameters
 

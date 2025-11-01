@@ -1,14 +1,34 @@
 {
   "GUEST": [
     "get_public_qsar_model_info",
-    "search_chemicals"
+    "search_chemicals",
+    "list_profilers",
+    "get_profiler_info",
+    "list_simulators",
+    "get_simulator_info",
+    "list_calculators",
+    "get_calculator_info",
+    "get_endpoint_tree",
+    "get_metadata_hierarchy",
+    "list_qsar_models",
+    "list_all_qsar_models"
   ],
   "RESEARCHER": [
     "get_public_qsar_model_info",
     "search_chemicals",
     "run_qsar_prediction",
     "analyze_chemical_hazard",
-    "generate_metabolites"
+    "generate_metabolites",
+    "list_profilers",
+    "get_profiler_info",
+    "list_simulators",
+    "get_simulator_info",
+    "list_calculators",
+    "get_calculator_info",
+    "get_endpoint_tree",
+    "get_metadata_hierarchy",
+    "list_qsar_models",
+    "list_all_qsar_models"
   ],
   "LAB_ADMIN": [
     "get_public_qsar_model_info",
@@ -16,7 +36,17 @@
     "run_qsar_prediction",
     "analyze_chemical_hazard",
     "generate_metabolites",
-    "retrain_qsar_model"
+    "retrain_qsar_model",
+    "list_profilers",
+    "get_profiler_info",
+    "list_simulators",
+    "get_simulator_info",
+    "list_calculators",
+    "get_calculator_info",
+    "get_endpoint_tree",
+    "get_metadata_hierarchy",
+    "list_qsar_models",
+    "list_all_qsar_models"
   ],
   "SYSTEM_BYPASS": [
     "get_public_qsar_model_info",
@@ -24,6 +54,16 @@
     "run_qsar_prediction",
     "analyze_chemical_hazard",
     "generate_metabolites",
-    "retrain_qsar_model"
+    "retrain_qsar_model",
+    "list_profilers",
+    "get_profiler_info",
+    "list_simulators",
+    "get_simulator_info",
+    "list_calculators",
+    "get_calculator_info",
+    "get_endpoint_tree",
+    "get_metadata_hierarchy",
+    "list_qsar_models",
+    "list_all_qsar_models"
   ]
 }
