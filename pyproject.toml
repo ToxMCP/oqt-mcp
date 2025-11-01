@@ -1,28 +1,39 @@
-[tool.poetry]
+[project]
 name = "o-qt-mcp-server"
 version = "0.1.0"
 description = "Model Context Protocol (MCP) Server for the O-QT OECD QSAR Toolbox"
-authors = ["Your Name <you@example.com>"]
-license = "MIT"
 readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "O-QT Team", email = "oss@senseibelbi.dev" }
+]
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "fastapi>=0.111.0,<0.112.0",
+    "uvicorn[standard]>=0.29.0,<0.30.0",
+    "pydantic>=2.7.1,<2.8.0",
+    "pydantic-settings>=2.3.3,<2.4.0",
+    "python-json-logger>=2.0.7,<3.0.0",
+    "authlib>=1.3.0,<2.0.0",
+    "httpx>=0.27.0,<0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0,<9.0.0",
+    "requests>=2.31.0,<3.0.0",
+    "black>=24.4.2,<25.0.0",
+    "isort>=5.13.2,<6.0.0",
+]
+
+[project.urls]
+Repository = "https://github.com/senseibelbi/O_QT_MCP"
+
+[tool.poetry]
 package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.111.0"
-uvicorn = {extras = ["standard"], version = "^0.29.0"}
-pydantic = "^2.7.1"
-pydantic-settings = "^2.3.3"
-python-json-logger = "^2.0.7"
-authlib = "^1.3.0"
-httpx = "^0.27.0"
-# Add specific scientific libraries here as needed (e.g., pandas, numpy, rdkit for QSAR)
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.2.0"
-requests = "^2.31.0"
-black = "^24.4.2"
-isort = "^5.13.2"
 
 [build-system]
 requires = ["poetry-core"]

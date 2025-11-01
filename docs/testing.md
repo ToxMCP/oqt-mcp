@@ -9,10 +9,10 @@ poetry install --no-root
 ## Running Tests
 
 ```bash
-PYTHONPATH=src poetry run python -m pytest
+poetry run pytest
 ```
 
-Pytest configuration lives in `pyproject.toml` (pythonpath, asyncio mode, warning filters).
+Pytest configuration lives in `pyproject.toml`. You can target specific directories or files (e.g. `poetry run pytest tests/auth -q`) without additional `PYTHONPATH` tweaks.
 
 ## Formatting & Linting
 

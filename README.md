@@ -132,6 +132,7 @@ Refer to:
 - `docs/observability.md` for audit/correlation-id behaviour and guidance on wiring custom sinks.
 - `docs/testing.md` for local tooling, pytest commands, and CI details.
 - `docs/release_process.md` for the release checklist and tagging workflow.
+- `docs/integration_guides/mcp_integration.md` for instructions on connecting Claude Code, Codex CLI, Gemini CLI, and other MCP-aware agents.
 
 ## Release Management
 
