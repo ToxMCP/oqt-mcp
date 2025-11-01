@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,10 +25,36 @@ from src.mcp.router import router as mcp_router
 
 log = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.info("O-QT MCP Server starting up...")
+    if settings.security.BYPASS_AUTH:
+        log.warning(
+            "WARNING: Authentication bypass (BYPASS_AUTH) is enabled. Do not run in production."
+        )
+    if settings.qsar.QSAR_TOOLBOX_API_URL.startswith("http://localhost"):
+        log.warning(
+            "QSAR Toolbox API URL is set to a local address: %s. Ensure this is accessible from the container/server environment.",
+            settings.qsar.QSAR_TOOLBOX_API_URL,
+        )
+    try:
+        validate_oidc_configuration()
+    except RuntimeError as exc:
+        log.error("OIDC configuration validation failed: %s", exc)
+        if not settings.security.BYPASS_AUTH:
+            raise
+    try:
+        yield
+    finally:
+        log.info("O-QT MCP Server shutting down...")
+
+
 app = FastAPI(
     title="O-QT MCP Server",
     description="Model Context Protocol Server for the OECD QSAR Toolbox. Built for security and interoperability.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # --- Middleware ---
@@ -113,26 +140,6 @@ async def health_check():
         "auth_bypassed": settings.security.BYPASS_AUTH,
         "qsar_api_url": settings.qsar.QSAR_TOOLBOX_API_URL,
     }
-
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    log.info("O-QT MCP Server starting up...")
-    if settings.security.BYPASS_AUTH:
-        log.warning(
-            "WARNING: Authentication bypass (BYPASS_AUTH) is enabled. Do not run in production."
-        )
-    if settings.qsar.QSAR_TOOLBOX_API_URL.startswith("http://localhost"):
-        log.warning(
-            f"QSAR Toolbox API URL is set to a local address: {settings.qsar.QSAR_TOOLBOX_API_URL}. Ensure this is accessible from the container/server environment."
-        )
-    try:
-        validate_oidc_configuration()
-    except RuntimeError as exc:
-        log.error(f"OIDC configuration validation failed: {exc}")
-        if not settings.security.BYPASS_AUTH:
-            raise
 
 
 if __name__ == "__main__":
