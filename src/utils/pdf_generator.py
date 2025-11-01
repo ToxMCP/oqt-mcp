@@ -16,7 +16,12 @@ def _escape(text: str) -> str:
 
 
 def _build_content(summary: str, metadata: dict, snapshot: str) -> str:
-    lines = ["O-QT MCP Workflow Report", "", f"Generated: {datetime.utcnow().isoformat(timespec='seconds')}Z", ""]
+    lines = [
+        "O-QT MCP Workflow Report",
+        "",
+        f"Generated: {datetime.utcnow().isoformat(timespec='seconds')}Z",
+        "",
+    ]
     lines.append("Summary")
     for line in wrap(summary, MAX_CHARS) or [""]:
         lines.append(line)
@@ -36,7 +41,9 @@ def _build_content(summary: str, metadata: dict, snapshot: str) -> str:
     commands = []
     for line in lines:
         if y < 72:
-            commands.append("ET BT")  # ensure text object resets if new page (not implementing multi-page)
+            commands.append(
+                "ET BT"
+            )  # ensure text object resets if new page (not implementing multi-page)
             y = DEFAULT_TOP
         escaped = _escape(line)
         commands.append(f"BT /F1 12 Tf {DEFAULT_LEFT} {y} Td ({escaped}) Tj ET")
@@ -45,7 +52,11 @@ def _build_content(summary: str, metadata: dict, snapshot: str) -> str:
 
 
 def generate_pdf_report(log_data: dict) -> BytesIO:
-    summary = log_data.get("final_report") or log_data.get("summary") or "No narrative available."
+    summary = (
+        log_data.get("final_report")
+        or log_data.get("summary")
+        or "No narrative available."
+    )
     inputs = log_data.get("inputs") if isinstance(log_data.get("inputs"), dict) else {}
     identifier = inputs.get("identifier") if isinstance(inputs, dict) else None
     identifier = identifier or log_data.get("identifier") or "Unknown"

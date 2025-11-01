@@ -66,9 +66,7 @@ def test_run_profiler(monkeypatch):
     async def fake_profile(prof_guid, chem_id, simulator_guid=None):
         return {"result": "ok", "sim": simulator_guid}
 
-    monkeypatch.setattr(
-        execution.qsar_client, "profile_with_profiler", fake_profile
-    )
+    monkeypatch.setattr(execution.qsar_client, "profile_with_profiler", fake_profile)
 
     result = asyncio.run(execution.run_profiler("prof", "chem"))
     assert result["profiler_guid"] == "prof"
@@ -79,9 +77,7 @@ def test_run_profiler_with_simulator(monkeypatch):
     async def fake_profile(prof_guid, chem_id, simulator_guid=None):
         return {"sim": simulator_guid}
 
-    monkeypatch.setattr(
-        execution.qsar_client, "profile_with_profiler", fake_profile
-    )
+    monkeypatch.setattr(execution.qsar_client, "profile_with_profiler", fake_profile)
 
     result = asyncio.run(execution.run_profiler("prof", "chem", "sim"))
     assert result["simulator_guid"] == "sim"
@@ -123,13 +119,9 @@ def test_download_qsar_report(monkeypatch):
     async def fake_report(chem_id, qsar_guid, comments):
         return {"report": True, "comments": comments}
 
-    monkeypatch.setattr(
-        execution.qsar_client, "generate_qsar_report", fake_report
-    )
+    monkeypatch.setattr(execution.qsar_client, "generate_qsar_report", fake_report)
 
-    result = asyncio.run(
-        execution.download_qsar_report("chem", "model", "note")
-    )
+    result = asyncio.run(execution.download_qsar_report("chem", "model", "note"))
     assert result["report"]["comments"] == "note"
 
 
@@ -137,9 +129,7 @@ def test_execute_workflow(monkeypatch):
     async def fake_workflow(workflow_guid, chem_id):
         return {"workflow": workflow_guid, "chem": chem_id}
 
-    monkeypatch.setattr(
-        execution.qsar_client, "execute_workflow", fake_workflow
-    )
+    monkeypatch.setattr(execution.qsar_client, "execute_workflow", fake_workflow)
 
     result = asyncio.run(execution.execute_workflow("wf", "chem"))
     assert result["result"]["workflow"] == "wf"
@@ -149,13 +139,9 @@ def test_download_workflow_report(monkeypatch):
     async def fake_workflow_report(chem_id, workflow_guid, comments):
         return {"report": True, "comments": comments}
 
-    monkeypatch.setattr(
-        execution.qsar_client, "workflow_report", fake_workflow_report
-    )
+    monkeypatch.setattr(execution.qsar_client, "workflow_report", fake_workflow_report)
 
-    result = asyncio.run(
-        execution.download_workflow_report("chem", "wf", "note")
-    )
+    result = asyncio.run(execution.download_workflow_report("chem", "wf", "note"))
     assert result["report"]["comments"] == "note"
 
 
@@ -163,13 +149,9 @@ def test_group_chemicals(monkeypatch):
     async def fake_group(chem_id, profiler_guid):
         return ["chemA", "chemB"]
 
-    monkeypatch.setattr(
-        execution.qsar_client, "group_by_profiler", fake_group
-    )
+    monkeypatch.setattr(execution.qsar_client, "group_by_profiler", fake_group)
 
-    result = asyncio.run(
-        execution.group_chemicals("chem", "prof")
-    )
+    result = asyncio.run(execution.group_chemicals("chem", "prof"))
     assert result["group"] == ["chemA", "chemB"]
 
 
@@ -177,9 +159,7 @@ def test_structure_connectivity(monkeypatch):
     async def fake_conn(smiles):
         return "connect"
 
-    monkeypatch.setattr(
-        execution.qsar_client, "get_connectivity", fake_conn
-    )
+    monkeypatch.setattr(execution.qsar_client, "get_connectivity", fake_conn)
 
     result = asyncio.run(execution.structure_connectivity("CCO"))
     assert result["connectivity"] == "connect"

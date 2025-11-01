@@ -32,9 +32,7 @@ def test_run_qsar_prediction(monkeypatch):
 
     monkeypatch.setattr(qsar_tools.qsar_client, "run_prediction", fake_prediction)
 
-    result = asyncio.run(
-        qsar_tools.run_qsar_prediction("CCO", "model-123")
-    )
+    result = asyncio.run(qsar_tools.run_qsar_prediction("CCO", "model-123"))
     assert result["Model"] == "model-123"
     assert result["SMILES"] == "CCO"
 
@@ -50,16 +48,10 @@ def test_analyze_chemical_hazard(monkeypatch):
         calls["profile"] = (chemical_identifier,)
         return {"Profile": ["alert"]}
 
-    monkeypatch.setattr(
-        qsar_tools.qsar_client, "get_endpoint_data", fake_endpoint_data
-    )
-    monkeypatch.setattr(
-        qsar_tools.qsar_client, "profile_chemical", fake_profile
-    )
+    monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_data", fake_endpoint_data)
+    monkeypatch.setattr(qsar_tools.qsar_client, "profile_chemical", fake_profile)
 
-    result = asyncio.run(
-        qsar_tools.analyze_chemical_hazard("50-00-0", "Mutagenicity")
-    )
+    result = asyncio.run(qsar_tools.analyze_chemical_hazard("50-00-0", "Mutagenicity"))
 
     assert result["chemical_identifier"] == "50-00-0"
     assert result["endpoint"] == "Mutagenicity"
@@ -73,13 +65,9 @@ def test_generate_metabolites(monkeypatch):
     async def fake_generate(smiles: str, simulator: str):
         return {"Simulated": True, "Simulator": simulator, "SMILES": smiles}
 
-    monkeypatch.setattr(
-        qsar_tools.qsar_client, "generate_metabolites", fake_generate
-    )
+    monkeypatch.setattr(qsar_tools.qsar_client, "generate_metabolites", fake_generate)
 
-    result = asyncio.run(
-        qsar_tools.generate_metabolites("CCO", "Liver")
-    )
+    result = asyncio.run(qsar_tools.generate_metabolites("CCO", "Liver"))
     assert result["Simulated"] is True
     assert result["Simulator"] == "Liver"
     assert result["SMILES"] == "CCO"

@@ -67,7 +67,9 @@ def test_list_calculators(monkeypatch):
     async def fake_list_calculators():
         return [{"Guid": "calc", "Caption": "Calculator"}]
 
-    monkeypatch.setattr(discovery.qsar_client, "list_calculators", fake_list_calculators)
+    monkeypatch.setattr(
+        discovery.qsar_client, "list_calculators", fake_list_calculators
+    )
 
     result = asyncio.run(discovery.list_calculators())
     assert result == {"calculators": [{"Guid": "calc", "Caption": "Calculator"}]}
@@ -89,7 +91,9 @@ def test_get_endpoint_tree(monkeypatch):
     async def fake_get_endpoint_tree():
         return ["A", "B"]
 
-    monkeypatch.setattr(discovery.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree)
+    monkeypatch.setattr(
+        discovery.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree
+    )
 
     result = asyncio.run(discovery.get_endpoint_tree())
     assert result == {"endpoint_tree": ["A", "B"]}
@@ -99,9 +103,7 @@ def test_get_metadata_hierarchy(monkeypatch):
     async def fake_get_meta():
         return [{"RigidPath": "X"}]
 
-    monkeypatch.setattr(
-        discovery.qsar_client, "get_metadata_hierarchy", fake_get_meta
-    )
+    monkeypatch.setattr(discovery.qsar_client, "get_metadata_hierarchy", fake_get_meta)
 
     result = asyncio.run(discovery.get_metadata_hierarchy())
     assert result == {"metadata_hierarchy": [{"RigidPath": "X"}]}
@@ -114,7 +116,10 @@ def test_list_qsar_models(monkeypatch):
     monkeypatch.setattr(discovery.qsar_client, "list_qsar_models", fake_list_models)
 
     result = asyncio.run(discovery.list_qsar_models("ECOTOX"))
-    assert result == {"position": "ECOTOX", "models": [{"Guid": "model", "Position": "ECOTOX"}]}
+    assert result == {
+        "position": "ECOTOX",
+        "models": [{"Guid": "model", "Position": "ECOTOX"}],
+    }
 
 
 def test_list_search_databases(monkeypatch):
