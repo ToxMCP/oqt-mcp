@@ -1,5 +1,6 @@
 import json
 import logging
+
 import pytest
 
 from src.auth import rbac

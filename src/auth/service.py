@@ -1,22 +1,23 @@
 import logging
-from authlib.jose import jwt, JoseError
-from fastapi import HTTPException, status, Request
-from fastapi.security import OAuth2AuthorizationCodeBearer
-import httpx
-from functools import lru_cache
 from datetime import datetime, timedelta
+from functools import lru_cache
 from threading import Lock
 from typing import Any, Dict
 
+import httpx
+from authlib.jose import JoseError, jwt
+from fastapi import HTTPException, Request, status
+from fastapi.security import OAuth2AuthorizationCodeBearer
+
 from src.auth.config import (
-    OIDC_ISSUER,
-    OIDC_AUDIENCE,
-    OIDC_ALGORITHMS,
-    JWKS_URI,
-    JWKS_CACHE_TTL_SECONDS,
     AUTHORIZATION_URL,
-    TOKEN_URL,
     BYPASS_AUTH,
+    JWKS_CACHE_TTL_SECONDS,
+    JWKS_URI,
+    OIDC_ALGORITHMS,
+    OIDC_AUDIENCE,
+    OIDC_ISSUER,
+    TOKEN_URL,
 )
 from src.auth.rbac import ROLES
 from src.config.settings import settings
@@ -28,31 +29,42 @@ log = logging.getLogger(__name__)
 _oauth2_scheme = None
 if OIDC_ISSUER and OIDC_AUDIENCE and AUTHORIZATION_URL and TOKEN_URL:
     _oauth2_scheme = OAuth2AuthorizationCodeBearer(
-        authorizationUrl=f"{AUTHORIZATION_URL}?audience={OIDC_AUDIENCE}" if AUTHORIZATION_URL else "",
+        authorizationUrl=(
+            f"{AUTHORIZATION_URL}?audience={OIDC_AUDIENCE}" if AUTHORIZATION_URL else ""
+        ),
         tokenUrl=TOKEN_URL or "",
         scopes={"openid": "OpenID Connect"},
-        auto_error=False # We handle errors manually to provide better context
+        auto_error=False,  # We handle errors manually to provide better context
     )
 elif not BYPASS_AUTH:
-    log.warning("Incomplete OIDC configuration detected; authentication will fail until configured properly.")
+    log.warning(
+        "Incomplete OIDC configuration detected; authentication will fail until configured properly."
+    )
+
 
 class User(dict):
     """Represents an authenticated user with roles."""
+
     @property
     def id(self) -> str:
         return self.get("sub", "")
 
     @property
     def roles(self) -> list[str]:
-        return self.get("roles", []) # Set during authentication
+        return self.get("roles", [])  # Set during authentication
+
 
 # JWKS cache state
 _jwks_cache: dict[str, any] = {"data": None, "expires_at": None}
 _jwks_lock = Lock()
 
+
 @lru_cache()
 def _cache_ttl() -> timedelta:
-    return timedelta(seconds=JWKS_CACHE_TTL_SECONDS if JWKS_CACHE_TTL_SECONDS > 0 else 300)
+    return timedelta(
+        seconds=JWKS_CACHE_TTL_SECONDS if JWKS_CACHE_TTL_SECONDS > 0 else 300
+    )
+
 
 def _cache_expired() -> bool:
     expires_at = _jwks_cache.get("expires_at")
@@ -60,10 +72,12 @@ def _cache_expired() -> bool:
         return True
     return datetime.utcnow() >= expires_at
 
+
 def _store_jwks(payload: dict) -> dict:
     _jwks_cache["data"] = payload
     _jwks_cache["expires_at"] = datetime.utcnow() + _cache_ttl()
     return payload
+
 
 def get_jwks(force_refresh: bool = False) -> dict:
     """
@@ -130,7 +144,9 @@ async def get_current_user(request: Request) -> User:
         return user
 
     if not _oauth2_scheme:
-        log.error("OIDC configuration (Issuer/Audience) is missing but BYPASS_AUTH is False.")
+        log.error(
+            "OIDC configuration (Issuer/Audience) is missing but BYPASS_AUTH is False."
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication system is not configured.",
@@ -160,7 +176,9 @@ async def get_current_user(request: Request) -> User:
             try:
                 payload = _decode_token(token, force_refresh=True)
             except JoseError as refreshed_error:
-                log.error(f"JWT validation error after refresh: {_sanitize_error(refreshed_error)}")
+                log.error(
+                    f"JWT validation error after refresh: {_sanitize_error(refreshed_error)}"
+                )
                 raise credentials_exception
         else:
             message = _sanitize_error(e)
@@ -175,7 +193,9 @@ async def get_current_user(request: Request) -> User:
     except HTTPException:
         raise
     except Exception as e:
-        log.error(f"An unexpected error occurred during authentication: {_sanitize_error(e)}")
+        log.error(
+            f"An unexpected error occurred during authentication: {_sanitize_error(e)}"
+        )
         raise credentials_exception
 
     user_roles = _extract_roles(payload)

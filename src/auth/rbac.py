@@ -15,10 +15,15 @@ ROLES = {
     "GUEST": "GUEST",
     "RESEARCHER": "RESEARCHER",
     "LAB_ADMIN": "LAB_ADMIN",
-    "SYSTEM_BYPASS": "SYSTEM_BYPASS", # Used only when BYPASS_AUTH is enabled
+    "SYSTEM_BYPASS": "SYSTEM_BYPASS",  # Used only when BYPASS_AUTH is enabled
 }
 
-_DEFAULT_PERMISSIONS_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "tool_permissions.default.json"
+_DEFAULT_PERMISSIONS_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "config"
+    / "tool_permissions.default.json"
+)
+
 
 def _load_permissions() -> Dict[str, List[str]]:
     custom_path = settings.security.TOOL_PERMISSIONS_FILE
@@ -35,11 +40,15 @@ def _load_permissions() -> Dict[str, List[str]]:
         log.error(f"Invalid JSON in tool permissions file: {exc}")
         raise
 
+
 try:
     TOOL_PERMISSIONS = _load_permissions()
 except Exception:
     TOOL_PERMISSIONS = {}
-    log.error("Failed to load tool permissions. RBAC checks will fail until this is resolved.")
+    log.error(
+        "Failed to load tool permissions. RBAC checks will fail until this is resolved."
+    )
+
 
 def _emit_metric(event: str, role: str, tool_name: str) -> None:
     # Placeholder for integration with metrics backend

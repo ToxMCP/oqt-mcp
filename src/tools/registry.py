@@ -1,23 +1,33 @@
-import logging
-from typing import Callable, Dict, Any
-from pydantic import BaseModel, ValidationError
-from src.mcp.protocol import ToolDefinition
-from src.auth.rbac import check_permission
-from src.auth.service import User
-from src.utils import audit
 import inspect
 import json
+import logging
+from typing import Any, Callable, Dict
+
+from pydantic import BaseModel, ValidationError
+
+from src.auth.rbac import check_permission
+from src.auth.service import User
+from src.mcp.protocol import ToolDefinition
+from src.utils import audit
 
 log = logging.getLogger(__name__)
+
 
 class ToolRegistry:
     """
     Manages the registration, discovery, and execution of tools.
     """
+
     def __init__(self):
         self._tools: Dict[str, Dict[str, Any]] = {}
 
-    def register(self, name: str, description: str, parameters_model: type[BaseModel], implementation: Callable):
+    def register(
+        self,
+        name: str,
+        description: str,
+        parameters_model: type[BaseModel],
+        implementation: Callable,
+    ):
         """Registers a new tool in the registry."""
         # Enforce snake_case convention (Section 3.3)
         if not name.islower() or " " in name or "." in name:
@@ -31,7 +41,9 @@ class ToolRegistry:
         parameters_schema = parameters_model.model_json_schema()
 
         self._tools[name] = {
-            "definition": ToolDefinition(name=name, description=description, parameters=parameters_schema),
+            "definition": ToolDefinition(
+                name=name, description=description, parameters=parameters_schema
+            ),
             "implementation": implementation,
             "parameters_model": parameters_model,
         }
@@ -88,21 +100,25 @@ class ToolRegistry:
             validated_params = tool["parameters_model"].model_validate(params)
         except ValidationError as e:
             # Pydantic provides detailed validation errors
-            raise InputValidationError(f"Invalid parameters for tool '{name}': {e.json()}")
+            raise InputValidationError(
+                f"Invalid parameters for tool '{name}': {e.json()}"
+            )
         except Exception as e:
             raise InputValidationError(f"Parameter validation failed unexpectedly: {e}")
 
         # 3. Execute the implementation
         implementation = tool["implementation"]
-        
+
         # Check if the implementation is async, otherwise run in a threadpool (if needed for blocking IO)
         try:
             if inspect.iscoroutinefunction(implementation):
-                 # Pass validated parameters as keyword arguments
+                # Pass validated parameters as keyword arguments
                 result = await implementation(**validated_params.model_dump())
             else:
                 # Handle synchronous functions (less ideal for FastAPI/Uvicorn)
-                log.warning(f"Tool '{name}' implementation is synchronous. Consider making it async.")
+                log.warning(
+                    f"Tool '{name}' implementation is synchronous. Consider making it async."
+                )
                 result = implementation(**validated_params.model_dump())
         except Exception as exc:
             audit.emit(
@@ -124,7 +140,7 @@ class ToolRegistry:
             logged_params = json.dumps(params, default=str, indent=2)[:500]
         except Exception:
             logged_params = "Params serialization failed"
-            
+
         audit.emit(
             {
                 "type": "tool_execution",
@@ -140,11 +156,14 @@ class ToolRegistry:
 
         return result
 
+
 class ToolNotFoundError(Exception):
     pass
 
+
 class InputValidationError(Exception):
     pass
+
 
 # Global registry instance
 tool_registry = ToolRegistry()

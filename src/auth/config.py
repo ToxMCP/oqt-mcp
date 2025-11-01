@@ -13,8 +13,10 @@ OIDC_ALGORITHMS: List[str] = settings.security.AUTH_OIDC_ALGORITHMS
 JWKS_CACHE_TTL_SECONDS: int = settings.security.AUTH_JWKS_CACHE_TTL_SECONDS
 BYPASS_AUTH: bool = settings.security.BYPASS_AUTH
 
+
 def _join_url(base: str, path: str) -> str:
     return f"{base.rstrip('/')}/{path.lstrip('/')}"
+
 
 AUTHORIZATION_URL: Optional[str] = None
 TOKEN_URL: Optional[str] = None
@@ -24,6 +26,7 @@ if OIDC_ISSUER:
     AUTHORIZATION_URL = _join_url(OIDC_ISSUER, "authorize")
     TOKEN_URL = _join_url(OIDC_ISSUER, "oauth/token")
     JWKS_URI = _join_url(OIDC_ISSUER, ".well-known/jwks.json")
+
 
 def validate_oidc_configuration() -> None:
     """

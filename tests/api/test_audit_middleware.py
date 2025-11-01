@@ -10,7 +10,9 @@ def test_audit_middleware_generates_correlation_id():
     audit.register_sink(events.append)
 
     client = TestClient(app)
-    response = client.post("/mcp", json={"jsonrpc": "2.0", "method": "initialize", "id": 1})
+    response = client.post(
+        "/mcp", json={"jsonrpc": "2.0", "method": "initialize", "id": 1}
+    )
 
     assert response.status_code == 200
     assert "X-Request-ID" in response.headers

@@ -1,9 +1,9 @@
+import asyncio
 from datetime import datetime, timedelta
 
-from authlib.jose import JoseError, JsonWebKey, jwt
-import asyncio
 import httpx
 import pytest
+from authlib.jose import JoseError, JsonWebKey, jwt
 from fastapi import HTTPException
 
 from src.auth import service as auth_service
@@ -118,7 +118,9 @@ def test_get_current_user_success(monkeypatch, dummy_request, configure_auth):
     assert user.roles == ["RESEARCHER"]
 
 
-def test_get_current_user_handles_missing_token(monkeypatch, dummy_request, configure_auth):
+def test_get_current_user_handles_missing_token(
+    monkeypatch, dummy_request, configure_auth
+):
     async def no_token(request):
         return None
 
@@ -160,11 +162,15 @@ def test_get_current_user_expired_token(monkeypatch, dummy_request, configure_au
 
 
 def test_decode_token_with_real_jwks(monkeypatch):
-    key = JsonWebKey.generate_key("RSA", 2048, is_private=True, options={"kid": "dev-key"})
+    key = JsonWebKey.generate_key(
+        "RSA", 2048, is_private=True, options={"kid": "dev-key"}
+    )
     monkeypatch.setattr(auth_service, "OIDC_ISSUER", "https://issuer.example.com")
     monkeypatch.setattr(auth_service, "OIDC_AUDIENCE", "aud")
     monkeypatch.setattr(auth_service, "OIDC_ALGORITHMS", ["RS256"])
-    monkeypatch.setattr(auth_service.settings.security, "AUTH_ROLE_CLAIM_PATH", "custom.claim.roles")
+    monkeypatch.setattr(
+        auth_service.settings.security, "AUTH_ROLE_CLAIM_PATH", "custom.claim.roles"
+    )
     public_jwk = key.as_dict(is_private=False)
     claims = {
         "sub": "user|42",
@@ -174,7 +180,9 @@ def test_decode_token_with_real_jwks(monkeypatch):
         "aud": "aud",
     }
     token = jwt.encode({"alg": "RS256", "kid": "dev-key"}, claims, key).decode("utf-8")
-    monkeypatch.setattr(auth_service, "get_jwks", lambda force_refresh=False: {"keys": [public_jwk]})
+    monkeypatch.setattr(
+        auth_service, "get_jwks", lambda force_refresh=False: {"keys": [public_jwk]}
+    )
 
     decoded = auth_service._decode_token(token)
     assert decoded["sub"] == "user|42"

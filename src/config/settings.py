@@ -1,13 +1,18 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
-from typing import Optional, List
 import os
+from functools import lru_cache
+from typing import List, Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class AppSettings(BaseSettings):
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
 
 class SecuritySettings(BaseSettings):
     # OAuth 2.0 / OIDC Configuration (Section 2.2)
@@ -23,13 +28,20 @@ class SecuritySettings(BaseSettings):
     # RBAC
     TOOL_PERMISSIONS_FILE: Optional[str] = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
 
 class QSARSettings(BaseSettings):
     # Connection details for the QSAR Toolbox WebAPI
-    QSAR_TOOLBOX_API_URL: str = os.getenv("QSAR_TOOLBOX_API_URL", "http://localhost:5000") # Default if not set
+    QSAR_TOOLBOX_API_URL: str = os.getenv(
+        "QSAR_TOOLBOX_API_URL", "http://localhost:5000"
+    )  # Default if not set
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
 
 class Settings(BaseSettings):
@@ -37,9 +49,11 @@ class Settings(BaseSettings):
     security: SecuritySettings = SecuritySettings()
     qsar: QSARSettings = QSARSettings()
 
+
 @lru_cache()
 def get_settings() -> Settings:
     # We instantiate the nested settings explicitly to ensure .env variables are loaded
     return Settings(app=AppSettings(), security=SecuritySettings(), qsar=QSARSettings())
+
 
 settings = get_settings()

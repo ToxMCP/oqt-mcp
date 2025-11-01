@@ -41,7 +41,9 @@ class QsarClient:
                 headers=self.headers,
                 transport=self.transport,
             ) as client:
-                response = await client.request(method, url_path, params=params, json=json)
+                response = await client.request(
+                    method, url_path, params=params, json=json
+                )
         except httpx.RequestError as exc:
             log.error("QSAR client network error: %s", exc)
             raise QsarClientError("Failed to reach QSAR Toolbox API") from exc
@@ -69,7 +71,11 @@ class QsarClient:
         return await self._request("GET", path, params=params)
 
     async def _post(
-        self, path: str, *, json: Optional[Dict[str, Any]] = None, params: Optional[Dict[str, Any]] = None
+        self,
+        path: str,
+        *,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         return await self._request("POST", path, params=params, json=json)
 
@@ -77,7 +83,9 @@ class QsarClient:
         encoded = quote(object_guid)
         return await self._get(f"/api/v6/about/object/{encoded}")
 
-    async def search_chemicals(self, query: str, search_type: str = "auto", ignore_stereo: bool = False) -> Dict[str, Any]:
+    async def search_chemicals(
+        self, query: str, search_type: str = "auto", ignore_stereo: bool = False
+    ) -> Dict[str, Any]:
         search_type = (search_type or "auto").lower()
         ignore_value = "true" if ignore_stereo else "false"
         encoded_query = quote(query)
@@ -99,12 +107,16 @@ class QsarClient:
         payload = {"smiles": smiles, "modelId": model_id}
         return await self._post("/api/v6/qsar/apply", json=payload)
 
-    async def get_applicability_domain(self, model_id: str, chem_id: str) -> Dict[str, Any]:
+    async def get_applicability_domain(
+        self, model_id: str, chem_id: str
+    ) -> Dict[str, Any]:
         encoded_model = quote(model_id)
         encoded_chem = quote(chem_id)
         return await self._get(f"/api/v6/qsar/domain/{encoded_model}/{encoded_chem}")
 
-    async def get_endpoint_data(self, chemical_identifier: str, endpoint: str) -> Dict[str, Any]:
+    async def get_endpoint_data(
+        self, chemical_identifier: str, endpoint: str
+    ) -> Dict[str, Any]:
         encoded = quote(chemical_identifier)
         params = {"endpoint": endpoint}
         return await self._get(f"/api/v6/data/{encoded}", params=params)

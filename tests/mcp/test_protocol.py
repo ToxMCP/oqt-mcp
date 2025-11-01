@@ -1,9 +1,10 @@
 import json
+
 import pytest
 from fastapi.testclient import TestClient
 
-from src.mcp.protocol import JSONRPCRequest, JSONRPCResponse, INVALID_REQUEST
 from src.api.server import app
+from src.mcp.protocol import INVALID_REQUEST, JSONRPCRequest, JSONRPCResponse
 
 
 def test_jsonrpc_request_rejects_boolean_id():
