@@ -45,6 +45,22 @@ This repository contains the boilerplate implementation of a Model Context Proto
     poetry run uvicorn src.api.server:app --reload
     ```
 
+## Configuration Reference
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `AUTH_OIDC_ISSUER` | yes (prod) | `None` | Base URL for the OIDC issuer (Auth0, Keycloak, etc.). |
+| `AUTH_OIDC_AUDIENCE` | yes (prod) | `None` | Audience/API identifier expected in access tokens. |
+| `AUTH_OIDC_ALGORITHMS` | yes (prod) | `["RS256"]` | JWT algorithms accepted during validation. |
+| `AUTH_JWKS_CACHE_TTL_SECONDS` | optional | `300` | TTL for JWKS cache. |
+| `AUTH_ROLE_CLAIM_PATH` | optional | `roles` | Dot-path where role claims can be extracted from the JWT. |
+| `BYPASS_AUTH` | dev only | `false` | When `true`, auth is bypassed (never enable in production). |
+| `QSAR_TOOLBOX_API_URL` | yes | `http://localhost:5000` | Base URL for the OECD QSAR Toolbox Web API. |
+| `LOG_LEVEL` | optional | `INFO` | Logging level for the application. |
+| `ENVIRONMENT` | optional | `development` | Environment label used in logs and telemetry. |
+
+Reference `docs/auth_testing.md` for detailed security configuration guidance and token generation tips.
+
 ## Running with Docker (Production/Sandboxed)
 
 1.  **Build the Docker image:**
@@ -70,6 +86,17 @@ docker compose up --build
 * The MCP container overrides `QSAR_TOOLBOX_API_URL` to reference the stub and sets `BYPASS_AUTH=true` for local development convenience. Adjust or remove these overrides when integrating with real infrastructure.
 
 To point at a real Toolbox deployment, update `QSAR_TOOLBOX_API_URL` in `.env` or via compose overrides, and disable authentication bypass.
+
+## Security Hardening Checklist
+
+Before running in production:
+
+1. Set `BYPASS_AUTH=false` and provide real OIDC issuer/audience settings.
+2. Rotate credentials and secrets via your orchestration platform (Kubernetes secrets, AWS Secrets Manager, etc.); avoid storing sensitive values in `.env`.
+3. Terminate TLS at a reverse proxy (e.g., Nginx, Envoy) in front of the MCP server, and restrict inbound ports.
+4. Tighten RBAC policies in `config/tool_permissions.default.json`, granting only required tools per role.
+5. Enable structured log forwarding and audit sinks using `docs/observability.md` guidance.
+6. Configure resource limits and health probes in your deployment platform; the Docker image already exposes `/health`.
 
 ## Architecture Overview
 
@@ -104,3 +131,12 @@ Refer to:
 - `docs/auth_testing.md` for detailed OIDC configuration, token generation tips, and test utilities.
 - `docs/observability.md` for audit/correlation-id behaviour and guidance on wiring custom sinks.
 - `docs/testing.md` for local tooling, pytest commands, and CI details.
+- `docs/release_process.md` for the release checklist and tagging workflow.
+
+## Release Management
+
+We track releases in `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) conventions.
+
+1. Update `CHANGELOG.md`, bump `pyproject.toml` version, and follow the checklist in `docs/release_process.md`.
+2. Tag releases using `git tag -a vX.Y.Z` and publish GitHub releases summarising the changes.
+3. Keep the `## [Unreleased]` section ready for future work after each release.
