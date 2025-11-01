@@ -17,6 +17,7 @@ setup_logging()
 # Import tool implementations to ensure they register themselves with the registry
 import src.tools.implementations.o_qt_qsar_tools
 import src.tools.implementations.toolbox_discovery
+import src.tools.implementations.toolbox_execution
 
 # Import routers
 from src.mcp.router import router as mcp_router

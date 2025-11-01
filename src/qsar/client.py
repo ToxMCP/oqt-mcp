@@ -134,6 +134,82 @@ class QsarClient:
         payload = {"smiles": smiles, "modelId": model_id}
         return await self._post("/api/v6/qsar/apply", json=payload)
 
+    async def apply_qsar_model(self, qsar_guid: str, chem_id: str) -> Any:
+        encoded_model = quote(qsar_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/qsar/apply/{encoded_model}/{encoded_chem}")
+
+    async def get_qsar_domain(self, qsar_guid: str, chem_id: str) -> Any:
+        encoded_model = quote(qsar_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/qsar/domain/{encoded_model}/{encoded_chem}")
+
+    async def generate_qmrf(self, qsar_id: str) -> Any:
+        encoded = quote(qsar_id)
+        return await self._get(f"/api/v6/report/qmrf/{encoded}")
+
+    async def generate_qsar_report(
+        self, chem_id: str, qsar_id: str, comments: str
+    ) -> Any:
+        encoded_chem = quote(chem_id)
+        encoded_qsar = quote(qsar_id)
+        encoded_comments = quote(comments or "")
+        return await self._get(
+            f"/api/v6/report/qsar/{encoded_chem}/{encoded_qsar}/{encoded_comments}"
+        )
+
+    async def execute_workflow(self, workflow_guid: str, chem_id: str) -> Any:
+        encoded_workflow = quote(workflow_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/workflows/{encoded_workflow}/{encoded_chem}")
+
+    async def list_workflows(self) -> Any:
+        return await self._get("/api/v6/workflows")
+
+    async def workflow_report(
+        self, chem_id: str, workflow_id: str, comments: str
+    ) -> Any:
+        encoded_chem = quote(chem_id)
+        encoded_workflow = quote(workflow_id)
+        encoded_comments = quote(comments or "")
+        return await self._get(
+            f"/api/v6/report/workflow/{encoded_chem}/{encoded_workflow}/{encoded_comments}"
+        )
+
+    async def group_by_profiler(self, chem_id: str, profiler_guid: str) -> Any:
+        encoded_chem = quote(chem_id)
+        encoded_prof = quote(profiler_guid)
+        return await self._get(f"/api/v6/grouping/{encoded_chem}/{encoded_prof}")
+
+    async def apply_qsar_model(self, qsar_guid: str, chem_id: str) -> Any:
+        encoded_model = quote(qsar_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/qsar/apply/{encoded_model}/{encoded_chem}")
+
+    async def get_qsar_domain(self, qsar_guid: str, chem_id: str) -> Any:
+        encoded_model = quote(qsar_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/qsar/domain/{encoded_model}/{encoded_chem}")
+
+    async def generate_qmrf(self, qsar_id: str) -> Any:
+        encoded = quote(qsar_id)
+        return await self._get(f"/api/v6/report/qmrf/{encoded}")
+
+    async def generate_qsar_report(
+        self, chem_id: str, qsar_id: str, comments: str
+    ) -> Any:
+        encoded_chem = quote(chem_id)
+        encoded_qsar = quote(qsar_id)
+        encoded_comments = quote(comments or "")
+        return await self._get(
+            f"/api/v6/report/qsar/{encoded_chem}/{encoded_qsar}/{encoded_comments}"
+        )
+
+    async def execute_workflow(self, workflow_guid: str, chem_id: str) -> Any:
+        encoded_workflow = quote(workflow_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/workflows/{encoded_workflow}/{encoded_chem}")
+
     async def list_qsar_models(self, position: str) -> Any:
         encoded = quote(position, safe="")
         return await self._get(f"/api/v6/qsar/list/{encoded}")
@@ -174,6 +250,25 @@ class QsarClient:
 
         return catalog
 
+    async def list_search_databases(self) -> Any:
+        return await self._get("/api/v6/search/databases")
+
+    async def canonicalize_structure(self, smiles: str) -> Any:
+        return await self._get("/api/v6/structure/canonize", params={"smiles": smiles})
+
+    async def get_connectivity(self, smiles: str) -> Any:
+        return await self._get(
+            "/api/v6/structure/connectivity", params={"smiles": smiles}
+        )
+
+    async def open_session(self) -> Any:
+        return await self._get("/api/v6/session/open")
+
+    async def signal_rid(self, connection_id: str) -> Any:
+        return await self._get(
+            "/api/v6/session/signalrid", params={"connectionId": connection_id}
+        )
+
     async def get_applicability_domain(
         self, model_id: str, chem_id: str
     ) -> Dict[str, Any]:
@@ -195,6 +290,45 @@ class QsarClient:
     async def profile_chemical(self, chemical_identifier: str) -> Dict[str, Any]:
         encoded = quote(chemical_identifier)
         return await self._get(f"/api/v6/profiling/{encoded}")
+
+    async def profile_with_profiler(
+        self, profiler_guid: str, chem_id: str, simulator_guid: Optional[str] = None
+    ) -> Any:
+        encoded_prof = quote(profiler_guid)
+        encoded_chem = quote(chem_id)
+        path = f"/api/v6/profiling/{encoded_prof}/{encoded_chem}"
+        if simulator_guid:
+            encoded_sim = quote(simulator_guid)
+            path = f"{path}/{encoded_sim}"
+        return await self._get(path)
+
+    async def profile_all(self, chem_id: str) -> Any:
+        encoded = quote(chem_id)
+        return await self._get(f"/api/v6/profiling/all/{encoded}")
+
+    async def profiler_literature(
+        self, profiler_guid: str, category: Optional[str] = None
+    ) -> Any:
+        encoded_prof = quote(profiler_guid)
+        params = {"category": category} if category else None
+        return await self._get(
+            f"/api/v6/profiling/{encoded_prof}/literature", params=params
+        )
+
+    async def simulate_metabolites_for_chem(
+        self, simulator_guid: str, chem_id: str
+    ) -> Any:
+        encoded_sim = quote(simulator_guid)
+        encoded_chem = quote(chem_id)
+        return await self._get(f"/api/v6/metabolism/{encoded_sim}/{encoded_chem}")
+
+    async def simulate_metabolites_for_smiles(
+        self, simulator_guid: str, smiles: str
+    ) -> Any:
+        encoded_sim = quote(simulator_guid)
+        return await self._get(
+            f"/api/v6/metabolism/{encoded_sim}", params={"smiles": smiles}
+        )
 
 
 # Global client instance using application settings

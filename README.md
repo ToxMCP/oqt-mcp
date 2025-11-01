@@ -93,6 +93,17 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `get_metadata_hierarchy` | Returns the metadata hierarchy useful for filtering experimental data. |
 | `list_qsar_models` | Lists QSAR models for a specific endpoint tree position. |
 | `list_all_qsar_models` | Enumerates the full QSAR catalog across the endpoint tree (deduplicated). |
+| `list_search_databases` | Enumerates searchable inventories in the QSAR Toolbox. |
+| `run_qsar_model` | Runs a specific QSAR model for a chemId and reports applicability domain status. |
+| `run_profiler` | Executes a profiler for a chemId (optionally providing a simulator). |
+| `run_metabolism_simulator` | Runs a metabolism simulator using either a chemId or SMILES. |
+| `download_qmrf` | Retrieves the QMRF report for a QSAR model. |
+| `download_qsar_report` | Retrieves the QSAR prediction report produced by the Toolbox. |
+| `execute_workflow` | Runs a Toolbox workflow for a chemId. |
+| `download_workflow_report` | Retrieves a workflow execution report. |
+| `group_chemicals_by_profiler` | Builds read-across groups for a chemId using a profiler GUID. |
+| `canonicalize_structure` | Returns the canonical SMILES for a structure. |
+| `structure_connectivity` | Returns the connectivity string for the supplied SMILES. |
 
 ### `run_qsar_workflow` parameters
 

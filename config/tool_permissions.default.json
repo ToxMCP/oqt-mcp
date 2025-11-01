@@ -11,7 +11,10 @@
     "get_endpoint_tree",
     "get_metadata_hierarchy",
     "list_qsar_models",
-    "list_all_qsar_models"
+    "list_all_qsar_models",
+    "canonicalize_structure",
+    "structure_connectivity",
+    "list_search_databases"
   ],
   "RESEARCHER": [
     "get_public_qsar_model_info",
@@ -28,7 +31,18 @@
     "get_endpoint_tree",
     "get_metadata_hierarchy",
     "list_qsar_models",
-    "list_all_qsar_models"
+    "list_all_qsar_models",
+    "run_qsar_model",
+    "run_profiler",
+    "run_metabolism_simulator",
+    "download_qmrf",
+    "download_qsar_report",
+    "execute_workflow",
+    "download_workflow_report",
+    "group_chemicals_by_profiler",
+    "canonicalize_structure",
+    "structure_connectivity",
+    "list_search_databases"
   ],
   "LAB_ADMIN": [
     "get_public_qsar_model_info",
@@ -46,7 +60,18 @@
     "get_endpoint_tree",
     "get_metadata_hierarchy",
     "list_qsar_models",
-    "list_all_qsar_models"
+    "list_all_qsar_models",
+    "run_qsar_model",
+    "run_profiler",
+    "run_metabolism_simulator",
+    "download_qmrf",
+    "download_qsar_report",
+    "execute_workflow",
+    "download_workflow_report",
+    "group_chemicals_by_profiler",
+    "canonicalize_structure",
+    "structure_connectivity",
+    "list_search_databases"
   ],
   "SYSTEM_BYPASS": [
     "get_public_qsar_model_info",
@@ -64,6 +89,17 @@
     "get_endpoint_tree",
     "get_metadata_hierarchy",
     "list_qsar_models",
-    "list_all_qsar_models"
+    "list_all_qsar_models",
+    "run_qsar_model",
+    "run_profiler",
+    "run_metabolism_simulator",
+    "download_qmrf",
+    "download_qsar_report",
+    "execute_workflow",
+    "download_workflow_report",
+    "group_chemicals_by_profiler",
+    "canonicalize_structure",
+    "structure_connectivity",
+    "list_search_databases"
   ]
 }

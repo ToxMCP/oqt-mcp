@@ -137,6 +137,16 @@ async def list_all_qsar_models() -> Dict[str, Any]:
     return {"catalog": catalog}
 
 
+async def list_search_databases() -> Dict[str, Any]:
+    try:
+        data = await qsar_client.list_search_databases()
+    except QsarClientError as exc:
+        log.error("Failed to list search databases: %s", exc)
+        raise
+    databases = data if isinstance(data, list) else []
+    return {"databases": databases}
+
+
 def register_discovery_tools() -> None:
     tool_registry.register(
         name="list_profilers",
@@ -206,6 +216,13 @@ def register_discovery_tools() -> None:
         description="Enumerates the QSAR model catalog across the entire endpoint tree (deduplicated).",
         parameters_model=EmptyParams,
         implementation=list_all_qsar_models,
+    )
+
+    tool_registry.register(
+        name="list_search_databases",
+        description="Lists searchable inventories/databases exposed by the Toolbox.",
+        parameters_model=EmptyParams,
+        implementation=list_search_databases,
     )
 
 
