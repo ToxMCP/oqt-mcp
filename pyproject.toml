@@ -32,6 +32,15 @@ Repository = "https://github.com/senseibelbi/O_QT_MCP"
 [tool.poetry]
 package-mode = false
 
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+requests = "^2.31.0"
+black = "^24.4.2"
+isort = "^5.13.2"
+
 [tool.poetry.dependencies]
 python = "^3.10"
 
