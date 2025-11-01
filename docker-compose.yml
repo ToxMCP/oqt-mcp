@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: o-qt-mcp-server:local
+    container_name: o-qt-mcp-server
+    env_file:
+      - .env
+    environment:
+      # Override QSAR Toolbox URL to point at the stub container by default.
+      QSAR_TOOLBOX_API_URL: http://toolbox-stub:5000
+      # Development convenience: toggle to false when integrating with real auth.
+      BYPASS_AUTH: "true"
+    depends_on:
+      - toolbox-stub
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  toolbox-stub:
+    image: ghcr.io/senseibelbi/qsar-toolbox-stub:latest
+    container_name: toolbox-stub
+    ports:
+      - "5000:5000"
+    environment:
+      # Adjust stub behaviour or latency if the image supports it.
+      STUB_LATENCY_MS: 0

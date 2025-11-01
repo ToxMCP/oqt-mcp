@@ -57,6 +57,20 @@ This repository contains the boilerplate implementation of a Model Context Proto
     docker run -d --name o-qt-mcp -p 8000:8000 --env-file .env o-qt-mcp-server
     ```
 
+## Local Stack with Docker Compose
+
+For end-to-end testing without a live OECD QSAR Toolbox instance, the repository includes a `docker-compose.yml` that pairs the MCP server with a lightweight Toolbox API stub.
+
+```bash
+docker compose up --build
+```
+
+* `mcp-server` is built from the local Dockerfile and exposes port `8000`.
+* `toolbox-stub` is a placeholder service (ghcr.io/senseibelbi/qsar-toolbox-stub) listening on port `5000`.
+* The MCP container overrides `QSAR_TOOLBOX_API_URL` to reference the stub and sets `BYPASS_AUTH=true` for local development convenience. Adjust or remove these overrides when integrating with real infrastructure.
+
+To point at a real Toolbox deployment, update `QSAR_TOOLBOX_API_URL` in `.env` or via compose overrides, and disable authentication bypass.
+
 ## Architecture Overview
 
 The server is built using FastAPI and Pydantic.
