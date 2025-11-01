@@ -24,7 +24,7 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
       - name: Install dependencies
-        run: poetry install --no-root
+        run: poetry install --no-root --with dev
       - name: Lint
         run: poetry run black --check . && poetry run isort --check .
       - name: Tests
