@@ -488,12 +488,34 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "Add optional QSAR live integration tests",
+        "description": "Provide an opt-in pytest suite that exercises the QSAR Toolbox client against a live sandbox API to ensure end-to-end connectivity.",
+        "details": "- Introduce fixtures/helpers that build a QsarClient pointed at QSAR_TOOLBOX_API_URL from settings.\n- Gate the tests behind env var or pytest marker so CI skips them by default.\n- Cover at least a read-only discovery call (profilers), a chemical search, and a light execution call that is safe for the sandbox.\n- Document how to run the suite in README/testing docs.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "Clean up pytest asyncio configuration",
+        "description": "Remove the `asyncio_mode` warning emitted by pytest by aligning configuration with the installed plugins.",
+        "details": "- Audit pyproject/test configuration for unsupported options.\n- Either add the required pytest-asyncio dependency or drop the option, whichever matches current usage.\n- Run `poetry run pytest` to confirm no warnings remain from pytest config.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "low",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-10-30T13:37:46.567Z",
       "description": "Default tasks context",
-      "updated": "2025-11-01T15:35:06.312Z"
+      "updated": "2025-11-01T15:41:48.372Z"
     }
   }
 }

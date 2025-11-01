@@ -51,7 +51,9 @@ profile = "black"
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-ra"
-asyncio_mode = "auto"
 filterwarnings = [
     "ignore:datetime.datetime.utcnow\\(\\) is deprecated"
+]
+markers = [
+    "integration: live QSAR Toolbox calls requiring QSAR_LIVE_TESTS=1"
 ]
