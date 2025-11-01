@@ -1,0 +1,29 @@
+{
+  "GUEST": [
+    "get_public_qsar_model_info",
+    "search_chemicals"
+  ],
+  "RESEARCHER": [
+    "get_public_qsar_model_info",
+    "search_chemicals",
+    "run_qsar_prediction",
+    "analyze_chemical_hazard",
+    "generate_metabolites"
+  ],
+  "LAB_ADMIN": [
+    "get_public_qsar_model_info",
+    "search_chemicals",
+    "run_qsar_prediction",
+    "analyze_chemical_hazard",
+    "generate_metabolites",
+    "retrain_qsar_model"
+  ],
+  "SYSTEM_BYPASS": [
+    "get_public_qsar_model_info",
+    "search_chemicals",
+    "run_qsar_prediction",
+    "analyze_chemical_hazard",
+    "generate_metabolites",
+    "retrain_qsar_model"
+  ]
+}

@@ -1,0 +1,78 @@
+<context>
+# Overview
+The O-QT MCP Server enables the OECD QSAR Toolbox conversational assistant to consume a secure Model Context Protocol (MCP) interface. The server mediates between LLM hosts and the existing QSAR Toolbox Web APIs, enforcing authentication, authorization, and observability so researchers can retrieve chemical insights safely.
+
+# Core Features
+- **MCP lifecycle implementation**: Support `initialize`, `initialized`, `shutdown`, and `exit` JSON-RPC methods so clients can negotiate capabilities and close sessions gracefully.
+- **Tool discovery and invocation**: Advertise QSAR tooling via `mcp/tool/list` and execute them through `mcp/tool/call`, returning structured JSON payloads that LLMs can interpret.
+- **Security envelope**: Integrate with OAuth 2.0 / OIDC for authentication, apply RBAC per tool, and expose configuration for development bypass while emphasising production hardening.
+- **QSAR Toolbox connectivity**: Provide async HTTP client wrappers for Toolbox endpoints covering model metadata, chemical search, hazard analysis, simulations, and predictions.
+- **Observability and audit logging**: Emit structured JSON logs with request/response tracing, error categorisation, and hooks for audit trails.
+
+# User Experience
+- **Personas**
+  - *Bench Researcher*: Invokes the assistant to fetch model details, run predictions, and interpret hazard profiles during experiment planning.
+  - *Lab Administrator*: Manages privileged operations (model retraining, configuration checks) and audits assistant interactions.
+- **Key flows**
+  1. MCP host negotiates features via `initialize`; receives available tool list filtered by RBAC.
+  2. Researcher calls a tool through the assistant; server validates auth, schema, and forwards to QSAR API; result returns as JSON.
+  3. Lab admin reviews audit logs or runs admin-only tools to verify compliance or trigger model maintenance routines.
+- **UX considerations**
+  - Clear error messaging with actionable guidance (missing scopes, QSAR downtime).
+  - Predictable JSON schema for each tool to ease LLM prompt engineering.
+  - Latency signalling for long computations (progress or async patterns in future).
+</context>
+<PRD>
+# Technical Architecture
+- **API Layer**: FastAPI app exposing a single `/mcp` JSON-RPC endpoint plus `/health`.
+- **Protocol Handling**: Pydantic models enforce JSON-RPC 2.0 contracts; router dispatches lifecycle and tool methods.
+- **Security Components**: Authlib-backed JWT verification, JWKS caching, FastAPI dependency to extract bearer tokens, RBAC matrix controlling tool exposure and execution.
+- **Tool Registry**: Central registry storing tool metadata, input schemas, and coroutine implementations; supports permission checks and audit logging.
+- **QSAR Integrations**: Async HTTP clients (httpx) targeting Toolbox Web API resources for model info, searches, predictions, hazard analysis, and metabolite generation; retries and timeout safeguards.
+- **Configuration**: Pydantic Settings reading `.env` for environment, security, and QSAR API URLs; toggles for dev bypass.
+- **Logging & Observability**: python-json-logger emitting structured logs, audit middleware, and placeholders for tamper-resistant sinks.
+- **Deployment**: Poetry-based dependency management and multi-stage Dockerfile running as non-root with production-ready entrypoint.
+
+# Development Roadmap
+- **Phase 1 – Foundation**
+  - Finalise project scaffolding (Poetry, linting, CI placeholders).
+  - Harden JSON-RPC router behaviours, error taxonomy, and lifecycle responses.
+- **Phase 2 – Security Layer**
+  - Complete OIDC integration (JWKS refresh, error paths, configuration validation).
+  - Implement RBAC enforcement with coverage tests and role claims mapping.
+- **Phase 3 – QSAR Tooling**
+  - Build HTTP client wrapper with retries, timeouts, and error propagation.
+  - Implement each tool’s end-to-end flow with real QSAR API calls and response normalization.
+  - Add pagination / batching helpers where Toolbox endpoints require it.
+- **Phase 4 – Observability & Compliance**
+  - Expand audit middleware to capture user identity, tool usage, and outcomes.
+  - Add structured error logging, rate limiting hooks, and metrics stubs.
+- **Phase 5 – Testing & Delivery**
+  - Write unit tests and integration tests (mocking QSAR API).
+  - Provide Docker compose samples or scripts for local QSAR proxy.
+  - Document configuration, deployment, and security hardening steps.
+- **Stretch Enhancements**
+  - Streaming responses or async job orchestration for lengthy QSAR computations.
+  - Tool output DLP filters and redaction framework.
+  - Resource listing (datasets, reports) to meet expanded MCP features.
+
+# Logical Dependency Chain
+1. Establish foundation (project config, protocol compliance) before integrating external services.
+2. Implement security prior to exposing tools to ensure RBAC filters the discovery list.
+3. Develop QSAR tool implementations sequentially: model info → search → prediction → hazard analysis → metabolites → retraining.
+4. Layer observability once core tool flows succeed to capture meaningful telemetry.
+5. Finalise testing and packaging only after functional features and logging are in place.
+6. Consider stretch goals once MVP is stable and deployable.
+
+# Risks and Mitigations
+- **OIDC misconfiguration**: Provide clear startup warnings, extensive validation, and development bypass toggle.
+- **QSAR API instability**: Add retries/backoff, configurable timeouts, and mock servers for testing.
+- **Security gaps**: Enforce least privilege RBAC defaults, document production hardening (TLS termination, strict CORS).
+- **Long-running computations**: Introduce async patterns and potential job queue integration; expose status metadata in responses.
+- **Schema drift impacting LLM prompts**: Version tool schemas, document changes, and provide example payloads in README.
+
+# Appendix
+- QSAR Toolbox API endpoints reference TBD (pending official documentation).
+- Potential supporting libraries: `tenacity` for retries, `aiocache` for caching, `structlog` if richer logging needed.
+- Docker deployment considerations: non-root user, environment variable management, secret injection via orchestration layer.
+</PRD>

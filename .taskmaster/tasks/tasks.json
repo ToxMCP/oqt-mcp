@@ -1,0 +1,422 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Harden MCP lifecycle and routing",
+        "description": "Finalize JSON-RPC 2.0 handling, lifecycle endpoints, and error taxonomy for the O-QT MCP server.",
+        "details": "- Review and adjust `src/mcp/router.py` and `src/mcp/protocol.py` to ensure full JSON-RPC 2.0 compliance, including notifications and structured errors.\n- Confirm capability negotiation data matches MCP expectations and document version support.\n- Add unit tests that cover happy paths and malformed request handling for initialize, list tools, and call tool routing.\n- Update README with protocol behaviour notes if gaps are discovered.",
+        "testStrategy": "- Unit tests around protocol models and router dispatch using pytest.\n- Negative tests verifying invalid payloads yield proper JSON-RPC errors.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Validate JSON-RPC request/response models",
+            "description": "Audit `src/mcp/protocol.py` to ensure JSON-RPC 2.0 compliance, including id handling, notification semantics, and error exclusivity.",
+            "details": "- Confirm `JSONRPCResponse` rejects simultaneous `result` and `error` and accepts explicit null results.\n- Ensure batch requests are explicitly unsupported with documented error.\n- Align default values with MCP expectations (protocol version naming).",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 2,
+            "title": "Harden router dispatch and error taxonomy",
+            "description": "Review `src/mcp/router.py` to normalize error codes, HTTP status mapping, and logging for unexpected exceptions.",
+            "details": "- Ensure `dispatch_request` returns MCP-compliant errors for unsupported methods and positional params.\n- Verify HTTP status codes align with MCP guidance while JSON-RPC body remains authoritative.\n- Add structured log messages for lifecycle events (`initialize`, `shutdown`, `exit`).",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 3,
+            "title": "Add protocol unit tests",
+            "description": "Create pytest coverage for lifecycle methods, notifications, and malformed payloads to guard regression.",
+            "details": "- Mock FastAPI request to test JSON parsing and invalid schema responses.\n- Verify notifications (`initialized`, `shutdown`, `exit`) return HTTP 204 and no body.\n- Cover error translation for `METHOD_NOT_FOUND`, `INVALID_PARAMS`, and unhandled exceptions.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 4,
+            "title": "Document MCP capability negotiation",
+            "description": "Update README and/or docs to describe implemented MCP features, protocol version, and unsupported capabilities.",
+            "details": "- Summarize `SERVER_FEATURES` matrix and rationale for disabled features (sampling, resources).\n- Provide example `initialize` request/response for O-QT assistant integration.\n- Note expectations for JSON-RPC batching (unsupported) and error codes.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Complete OIDC authentication flow",
+        "description": "Implement production-ready OAuth2/OIDC integration with JWKS caching and configuration validation.",
+        "details": "- Wire Authlib verification into FastAPI dependency, handling token extraction errors and issuer/audience mismatches gracefully.\n- Implement JWKS refresh strategy with caching and fallback behaviour for outages.\n- Surface clear startup warnings when OIDC settings are missing while BYPASS_AUTH is disabled.\n- Document required environment variables and provide mocked tokens for local testing.",
+        "testStrategy": "- Unit tests for token validation logic using generated JWTs.\n- Integration tests hitting the `/mcp` endpoint with mocked headers to confirm auth enforcement.",
+        "status": "done",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Validate OIDC configuration loading",
+            "description": "Ensure settings from `.env` populate issuer, audience, algorithms, and JWKS URL with clear startup failures.",
+            "details": "- Add checks in `src/auth/config.py` to guard against missing trailing slash variations.\n- Emit startup logs when BYPASS_AUTH is True vs False with unset issuer/audience.\n- Provide helpful exception messages guiding configuration.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 2,
+            "title": "Implement JWKS caching and refresh",
+            "description": "Add caching around JWKS retrieval with configurable TTL and fallback to last known keys during outages.",
+            "details": "- Store JWKS in-memory with timestamp and expose refresh helper.\n- Handle HTTP failures by surfacing 503 while retaining last valid keys if not expired.\n- Add retries/backoff when fetching JWKS to handle transient network issues.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 3,
+            "title": "Harden token validation and error handling",
+            "description": "Ensure `get_current_user` returns precise errors for missing tokens, invalid scopes, and signature failures while logging securely.",
+            "details": "- Differentiate between 401 (missing/invalid token) and 403 (insufficient roles) before RBAC.\n- Redact sensitive JWT details in logs; include correlation ids for audit.\n- Add safeguards against clock skew or expired tokens with meaningful messages.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 2
+          },
+          {
+            "id": 4,
+            "title": "Provide auth testing utilities and docs",
+            "description": "Create fixtures for generating signed JWTs in tests and document required environment variables and dev bypass workflow.",
+            "details": "- Add script or instructions for minting tokens using sample JWKS/private key.\n- Update README `.env` section clarifying `AUTH_OIDC_*` usage and dev bypass risks.\n- Ensure tests cover valid and invalid tokens using the fixtures.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 2
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Enforce RBAC for tool discovery and execution",
+        "description": "Ensure roles determine which tools are listed and executable, with policy definitions driven by configuration.",
+        "details": "- Expand `src/auth/rbac.py` to support configurable role-to-tool mappings and optional custom claims paths.\n- Prevent unauthorized tools from appearing in list responses or being executed.\n- Provide helper utilities to audit permissions and log denials with sufficient context.\n- Update documentation on recommended role claims per OIDC provider.",
+        "testStrategy": "- Unit tests covering allowed and denied paths with multiple role combinations.\n- Tests ensuring tool registry filtering respects RBAC decisions.",
+        "status": "done",
+        "dependencies": [
+          "1",
+          "2"
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define role claim extraction",
+            "description": "Make RBAC configurable for different OIDC providers by allowing custom claim paths for roles/groups.",
+            "details": "- Support extracting roles from nested claims (e.g., Keycloak `realm_access.roles`).\n- Provide defaults compatible with Toolbox assistant expectations.\n- Document configuration in README with examples.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 3
+          },
+          {
+            "id": 2,
+            "title": "Externalize tool permissions",
+            "description": "Load tool-to-role mappings from configuration (file or environment) so administrators can adjust access without code changes.",
+            "details": "- Introduce structured config (e.g., YAML/JSON env) for `TOOL_PERMISSIONS` with validation.\n- Provide sane defaults matching current mapping when config absent.\n- Add reload helper or startup validation to catch mismatched tool names.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 3
+          },
+          {
+            "id": 3,
+            "title": "Instrument RBAC enforcement",
+            "description": "Enhance logging and telemetry when users attempt unauthorized tools, including sanitized context for audits.",
+            "details": "- Log denied tool calls with user id, roles, tool name, and reason while avoiding sensitive params.\n- Emit metrics counters (placeholder) for allowed/denied operations to support monitoring integration.\n- Feed denial info into audit middleware for downstream pipelines.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 3
+          },
+          {
+            "id": 4,
+            "title": "Create RBAC test matrix",
+            "description": "Build pytest coverage ensuring role permutations return correct tool lists and execution access, including bypass role.",
+            "details": "- Mock users with different claims sources to validate claim extraction configuration.\n- Verify unauthorized access yields JSON-RPC `FORBIDDEN` and HTTP 403.\n- Add regression tests for configuration errors (unknown tool names, missing roles).",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 3
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Implement QSAR Toolbox client and error handling",
+        "description": "Create a reusable async client layer for the OECD QSAR Toolbox Web API with retries, timeouts, and error mapping.",
+        "details": "- Design a client module encapsulating base URL, authentication (if required), retry/backoff, and structured exceptions.\n- Replace placeholder logic in `src/tools/implementations/o_qt_qsar_tools.py` with real API interactions via the client wrapper.\n- Normalize external responses into consistent schemas for each tool, including pagination handling and metadata fields.\n- Log API failures with sanitized payload snippets for diagnostics.",
+        "testStrategy": "- Unit tests mocking HTTP responses to cover success, timeout, and error scenarios.\n- Integration test hitting a mock QSAR server (e.g., httpx.MockTransport) verifying tool outputs.",
+        "status": "done",
+        "dependencies": [
+          "1",
+          "3",
+          "8"
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extract Toolbox WebAPI endpoint contracts",
+            "description": "Read `/Users/ivodjidrovski/O-QT_MCP/Toolbox WebAPI.txt` and catalogue endpoints, parameters, and schemas needed for MCP tools.",
+            "details": "- Identify endpoints for model metadata (`/about/object/{objectGuid}`), calculators, data trees, search, predictions, hazard analysis, and metabolites.\n- Capture required GUIDs vs query params and response structures for each.\n- Note HTML vs JSON variants and decide which are relevant for MCP outputs.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 4
+          },
+          {
+            "id": 2,
+            "title": "Implement HTTP client core",
+            "description": "Create `src/qsar/client.py` (or similar) providing async helper with base URL, retries, auth headers, and structured exceptions.",
+            "details": "- Support configurable timeout, retry policy (e.g., exponential backoff) and optional API key/token.\n- Normalize error responses from Toolbox API into custom exception hierarchy.\n- Add logging hooks capturing endpoint, method, status, and sanitized payload snippets.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 4
+          },
+          {
+            "id": 3,
+            "title": "Build endpoint-specific service methods",
+            "description": "Add typed client methods for model info, chemical search, calculators, hazard evaluation, prediction, and metabolite simulation.",
+            "details": "- Translate Toolbox WebAPI parameters (GUIDs, query strings) into intuitive method signatures.\n- Normalize responses into Pydantic models reflecting JSON schema, trimming unused fields for MCP consumption.\n- Include pagination or batching support where APIs return large arrays (e.g., search results).",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 4
+          },
+          {
+            "id": 4,
+            "title": "Replace placeholder tool logic",
+            "description": "Update `src/tools/implementations/o_qt_qsar_tools.py` to call the new client methods and transform results for MCP responses.",
+            "details": "- Inject the client via dependency or module-level singleton for testability.\n- Ensure each tool returns consistent JSON aligned with Pydantic schemas and enumerations from the WebAPI.\n- Add graceful handling when Toolbox API returns empty results or partial data.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 4
+          },
+          {
+            "id": 5,
+            "title": "Test client error mapping",
+            "description": "Add pytest coverage for HTTP success, 4xx/5xx errors, and timeout scenarios using `httpx.MockTransport`.",
+            "details": "- Verify exceptions include endpoint, status code, and truncated response body.\n- Ensure retries respect idempotent operations and avoid repeating non-idempotent POSTs without safeguards.\n- Cover translation of Toolbox-specific error payloads into MCP `TOOL_EXECUTION_ERROR`.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 4
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Enhance observability and audit logging",
+        "description": "Strengthen logging, tracing, and audit capabilities for the MCP server.",
+        "details": "- Expand HTTP middleware to capture authenticated user identifiers, tool names, and outcomes while respecting privacy requirements.\n- Add structured log fields for correlation IDs, latency, and error categories.\n- Provide hooks or adapters to route audit events to external stores (e.g., CloudWatch, ELK) with clear extension points.\n- Document operational monitoring recommendations in the README.",
+        "testStrategy": "- Unit tests for middleware ensuring logging payloads include expected keys.\n- Manual verification through run logs when executing sample tool calls.",
+        "status": "done",
+        "dependencies": [
+          "1",
+          "4"
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Enhance audit middleware",
+            "description": "Capture user id, tool name, request id, and execution outcome in the HTTP middleware while minimizing PII exposure.",
+            "details": "- Pull authenticated user from request state/context to enrich audit entries.\n- Include latency measurement and response status in audit logs.\n- Ensure sensitive parameters are redacted before logging.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 5
+          },
+          {
+            "id": 2,
+            "title": "Add structured logging context",
+            "description": "Augment JSON logger setup with correlation IDs, tool names, and error categories for easier ingestion.",
+            "details": "- Generate request-scoped correlation ids and attach to all logs (middleware + tool execution).\n- Define consistent log fields (e.g., `event`, `mcp_method`, `qsar_endpoint`).\n- Update logging configuration to allow environment-driven log level overrides.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 5
+          },
+          {
+            "id": 3,
+            "title": "Provide audit sink extension points",
+            "description": "Design interfaces to forward audit events to external systems (e.g., message bus or log service) without coupling core code.",
+            "details": "- Implement optional hook or dependency-injected handler for audit events.\n- Include sample stub (e.g., stdout exporter) and document how to plug real sinks.\n- Ensure failure of external sinks does not impact primary request flow.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 5
+          },
+          {
+            "id": 4,
+            "title": "Document observability strategy",
+            "description": "Update README/operations guide with logging fields, audit event schema, and recommendations for monitoring integration.",
+            "details": "- Provide examples of structured log entries and audit records.\n- Outline integration steps for SIEM/ELK systems, including recommended retention settings.\n- Note privacy considerations and redaction steps when exporting audit data.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 5
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Build automated test suite and local tooling",
+        "description": "Create a comprehensive pytest suite and developer tooling to validate MCP behaviours.",
+        "details": "- Add pytest configuration, fixtures for mock QSAR API, and coverage for router, auth, RBAC, and tool flows.\n- Provide Makefile or Poetry scripts for running tests, linting, and type checks.\n- Integrate CI workflow skeleton (GitHub Actions) running tests and lint on push.\n- Capture sample JSON-RPC requests/responses for documentation and testing.",
+        "testStrategy": "- Run pytest with coverage ensuring >80% across critical modules.\n- Lint via black/isort or equivalent scripts to guarantee formatting consistency.",
+        "status": "done",
+        "dependencies": [
+          "1",
+          "4",
+          "5"
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up pytest infrastructure",
+            "description": "Configure pytest, coverage, and common fixtures to exercise FastAPI app and MCP endpoints.",
+            "details": "- Add `pytest.ini` or `pyproject` configuration enabling asyncio support and warnings.\n- Create shared fixtures for FastAPI test client with dependency overrides.\n- Integrate coverage reporting with sensible omit/include rules.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 6
+          },
+          {
+            "id": 2,
+            "title": "Create Toolbox API mock transport",
+            "description": "Implement reusable `httpx.MockTransport` or FastAPI mock server replicating Toolbox WebAPI responses for tests.",
+            "details": "- Cover endpoints documented in `Toolbox WebAPI.txt`, including success and error cases.\n- Provide sample payloads representing typical model info, search results, and prediction outputs.\n- Allow tests to inject the mock transport into the QSAR client via dependency override.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 6
+          },
+          {
+            "id": 3,
+            "title": "Add developer tooling commands",
+            "description": "Create Makefile or Poetry scripts for linting, formatting, testing, and type checking.",
+            "details": "- Provide commands like `poetry run pytest`, `poetry run black`, `poetry run isort`, and stub for mypy/pylint if adopted.\n- Update README with usage instructions for the commands.\n- Ensure scripts fail fast and can run in CI without extra setup.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 6
+          },
+          {
+            "id": 4,
+            "title": "Wire up CI pipeline",
+            "description": "Add GitHub Actions workflow running lint, tests, and coverage for pushes and PRs.",
+            "details": "- Configure Python matrix (e.g., 3.10/3.11) with Poetry cache optimisation.\n- Ensure workflow exports coverage artifact and enforces minimum threshold.\n- Include steps to build Docker image as optional job to validate packaging.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 6
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Finalize deployment and documentation",
+        "description": "Polish Docker packaging, environment configuration, and end-user documentation for the MCP server.",
+        "details": "- Review Dockerfile for best practices (multi-stage build, healthcheck, non-root enforcement) and add docker-compose sample connecting to QSAR API.\n- Document environment variables, security toggles, and deployment steps in README plus reference docs.\n- Provide quickstart guide for the O-QT assistant to integrate with the MCP endpoint.\n- Add CHANGELOG or release notes template for versioning strategy.",
+        "testStrategy": "- Build Docker image locally to confirm runtime.\n- Smoke test the container using sample requests to `/health` and `/mcp`.",
+        "status": "in-progress",
+        "dependencies": [
+          "6"
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Harden Docker packaging",
+            "description": "Review Dockerfile multi-stage build, add healthcheck, and ensure non-root runtime is preserved.",
+            "details": "- Verify Poetry install uses locked dependencies and reduce image size.\n- Add `HEALTHCHECK` hitting `/health` with curl/uvicorn.\n- Document guidelines for image scanning and base image updates.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 7
+          },
+          {
+            "id": 2,
+            "title": "Provide docker-compose sample",
+            "description": "Create compose file wiring MCP server to mocked Toolbox API (or configurable endpoint) for local development.",
+            "details": "- Include environment variable definitions and volume mounts for `.env`.\n- Document how to swap mock service for real Toolbox WebAPI instance.\n- Ensure compose setup works with `poetry run` workflows.",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7
+          },
+          {
+            "id": 3,
+            "title": "Document deployment & configuration",
+            "description": "Expand README with deployment steps, environment variable table, and security hardening checklist.",
+            "details": "- Provide instructions for running behind reverse proxy with TLS termination.\n- Detail required secrets (OIDC, QSAR API creds) and how to inject them securely.\n- Include troubleshooting guide for common deployment issues (missing JWKS, QSAR downtime).",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7
+          },
+          {
+            "id": 4,
+            "title": "Establish release management artifacts",
+            "description": "Create CHANGELOG template and outline semantic versioning workflow for MCP server releases.",
+            "details": "- Add `CHANGELOG.md` seeded with initial release notes.\n- Document tagging strategy and GitHub release process.\n- Provide checklist for pre-release validation (tests, security review, documentation updated).",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Catalogue Toolbox WebAPI resources for MCP tools",
+        "description": "Extract endpoint definitions from the Toolbox WebAPI reference and align them with planned MCP tools.",
+        "details": "- Review `/Users/ivodjidrovski/O-QT_MCP/Toolbox WebAPI.txt` to inventory available REST endpoints, data shapes, and required parameters.\n- Map endpoints to current tool concepts (model info, search, prediction, hazard, metabolites) and identify gaps requiring new tools or additional schemas.\n- Capture nuances such as GUID-based identifiers, pagination, metadata hierarchies, and HTML vs JSON variants.\n- Produce a reference document (e.g., Markdown in repo) summarising endpoint usage, expected inputs/outputs, and sample payloads for each tool.",
+        "testStrategy": "- Peer review or self-check the reference against the WebAPI document to ensure no critical endpoints were missed.\n- Validate that each planned MCP tool references a concrete WebAPI call with confirmed parameters.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Segment Toolbox WebAPI documentation",
+            "description": "Break the reference into functional domains (About, Calculation, Data, Chemical, Profilers, etc.) noting base paths and operations.",
+            "details": "- Create outline capturing each tag/section with description and endpoint list.\n- Highlight endpoints requiring authentication or special parameters.\n- Store notes in a Markdown draft under `docs/` for collaborative review.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 8
+          },
+          {
+            "id": 2,
+            "title": "Map endpoints to MCP tool responsibilities",
+            "description": "Align each planned MCP tool with one or more Toolbox endpoints, noting required identifiers and expected outputs.",
+            "details": "- Determine how `get_public_qsar_model_info`, `search_chemicals`, `run_qsar_prediction`, `analyze_chemical_hazard`, and `generate_metabolites` interact with the WebAPI.\n- Identify additional tools needed (e.g., calculators, endpoint tree navigation, metabolite enumeration) and propose names.\n- Flag endpoints needing asynchronous job handling or pagination so tool design can accommodate them.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 8
+          },
+          {
+            "id": 3,
+            "title": "Capture sample requests and responses",
+            "description": "Record representative JSON payloads for each endpoint/tool pairing to guide schema modeling and LLM prompt design.",
+            "details": "- Generate example request bodies/queries using GUID placeholders and typical search strings.\n- Store sanitized responses (with truncated arrays) illustrating key fields and nested structures.\n- Reference sample payloads in the tool documentation to aid future developers.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 8
+          },
+          {
+            "id": 4,
+            "title": "Review endpoint mapping with stakeholders",
+            "description": "Walk through the compiled reference with the O-QT assistant team to confirm coverage and prioritise tool implementations.",
+            "details": "- Validate assumptions about required Toolbox credentials, rate limits, and long-running jobs.\n- Adjust task backlog based on feedback (e.g., additional tools, de-prioritised endpoints).\n- Record meeting outcomes and update documentation accordingly.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 8
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-10-30T13:37:46.567Z",
+      "description": "Default tasks context",
+      "updated": "2025-11-01T08:20:20.820Z"
+    }
+  }
+}
