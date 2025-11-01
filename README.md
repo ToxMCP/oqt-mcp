@@ -1,143 +1,223 @@
-# O-QT OECD QSAR Toolbox - MCP Server
+# O-QT MCP Server
 
-This repository contains the boilerplate implementation of a Model Context Protocol (MCP) server for the O-QT OECD QSAR Toolbox. It is designed based on the principles outlined in "Architecting the Future of Agent-Driven Science," focusing on security, interoperability, and robustness.
+**Public MCP endpoint for the OECD QSAR Toolbox.**  
+Run QSAR workflows, stream structured outputs, and download audit-ready PDF reports through any MCP-aware agent (Claude Code, Codex CLI, Gemini CLI, etc.).
 
-## Features
+## Why this project exists
 
-*   **MCP Compliance:** Implements the JSON-RPC 2.0 specification for MCP communication over HTTP.
-*   **Security First (Zero Trust Architecture):**
-    *   **Authentication (Section 2.2):** Boilerplate for OAuth 2.0/OIDC integration (Auth0/Keycloak).
-    *   **Authorization (Section 2.2):** Fine-grained Role-Based Access Control (RBAC) at the tool level.
-    *   **Sandboxing (Section 2.4):** Dockerized using a multi-stage build, running as a non-root user.
-*   **Interoperability (Section 3.1):** Uses FastAPI which supports OpenAPI Specification (OAS) principles.
-*   **Robustness (Section 3.3):** Structured JSON logging, comprehensive error handling.
+Chemical safety work often relies on the proprietary OECD QSAR Toolbox desktop application. Scientists have to click through many screens to gather profilers, metabolism simulators, and QSAR predictions before writing regulatory reports.  
 
-## Prerequisites
+The O-QT MCP server turns that workflow into an **open, programmable interface**:
 
-*   Python 3.10+
-*   Poetry (for dependency management)
-*   Docker
-*   A running instance of the OECD QSAR Toolbox Web API (for the O-QT connection)
+- **Single MCP tool (`run_qsar_workflow`)** orchestrates the same multi-agent pipeline used in the O-QT AI Assistant.
+- **Structured JSON + Markdown + PDF** responses are returned in one call, ready for downstream automation.
+- **Vendor-neutral** – any coding agent that speaks MCP can trigger analyses and capture outputs.
 
-## Setup
+> Looking for the original assistant? The MCP server reuses the same core logic from [O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant) but wraps it in a secure, headless API designed for automation.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <your-repo-url>
-    cd o-qt-mcp-server
-    ```
+---
 
-2.  **Install dependencies:**
-    ```bash
-    poetry install
-    ```
+## Feature snapshot
 
-3.  **Configure Environment Variables:**
-    Copy `.env.example` to `.env` and fill in the required configurations.
+| Capability | Description |
+| --- | --- |
+| 🧬 **QSAR Workflow Automation** | Calls the OECD QSAR Toolbox WebAPI to run searches, profilers, metabolism simulators, and curated QSAR models. |
+| 🧾 **Regulatory-Ready Reporting** | Generates a comprehensive PDF (ReportLab), Markdown narrative, and JSON provenance bundle. |
+| 🔐 **Enterprise Security** | OAuth2/OIDC token validation, RBAC per tool, audit logging, Docker hardening. |
+| ⚙️ **MCP Native** | Full JSON‑RPC 2.0 compliance with `initialize`, `listTools`, `callTool`, `shutdown`. |
+| 🤖 **Agent Friendly** | Tested with Claude Code, Codex CLI, and Gemini CLI (see [integration guide](docs/integration_guides/mcp_integration.md)). |
 
-    ```bash
-    cp .env.example .env
-    ```
-    **Crucial:** Configure the OIDC settings for security and the `QSAR_TOOLBOX_API_URL`.
+---
 
-4.  **Run the server (Development):**
-    ```bash
-    poetry run uvicorn src.api.server:app --reload
-    ```
+## Table of contents
 
-## Configuration Reference
+1. [Quick start](#quick-start)
+2. [Configuration](#configuration)
+3. [Tool catalog](#tool-catalog)
+4. [Running the server](#running-the-server)
+5. [Integrating with coding agents](#integrating-with-coding-agents)
+6. [Output artifacts](#output-artifacts)
+7. [Security checklist](#security-checklist)
+8. [Development notes](#development-notes)
+9. [Roadmap](#roadmap)
+10. [License](#license)
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/senseibelbi/O_QT_MCP.git
+cd o-qt-mcp-server
+poetry install
+cp .env.example .env
+poetry run uvicorn src.api.server:app --reload
+```
+
+> **Important:** The server needs access to a running OECD QSAR Toolbox WebAPI instance (typically on a Windows host). Set `QSAR_TOOLBOX_API_URL` in `.env` to point to it.
+
+Once running, your MCP host connects to `http://localhost:8000/mcp`.
+
+---
+
+## Configuration
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `AUTH_OIDC_ISSUER` | yes (prod) | `None` | Base URL for the OIDC issuer (Auth0, Keycloak, etc.). |
-| `AUTH_OIDC_AUDIENCE` | yes (prod) | `None` | Audience/API identifier expected in access tokens. |
-| `AUTH_OIDC_ALGORITHMS` | yes (prod) | `["RS256"]` | JWT algorithms accepted during validation. |
-| `AUTH_JWKS_CACHE_TTL_SECONDS` | optional | `300` | TTL for JWKS cache. |
-| `AUTH_ROLE_CLAIM_PATH` | optional | `roles` | Dot-path where role claims can be extracted from the JWT. |
-| `BYPASS_AUTH` | dev only | `false` | When `true`, auth is bypassed (never enable in production). |
-| `QSAR_TOOLBOX_API_URL` | yes | `http://localhost:5000` | Base URL for the OECD QSAR Toolbox Web API. |
-| `LOG_LEVEL` | optional | `INFO` | Logging level for the application. |
-| `ENVIRONMENT` | optional | `development` | Environment label used in logs and telemetry. |
+| `QSAR_TOOLBOX_API_URL` | ✅ | `http://localhost:5000` | Base URL to the OECD QSAR Toolbox WebAPI. |
+| `AUTH_OIDC_ISSUER` | ✅ (prod) | – | OIDC issuer URL (Auth0, Keycloak, etc.). |
+| `AUTH_OIDC_AUDIENCE` | ✅ (prod) | – | Expected audience in access tokens. |
+| `AUTH_OIDC_ALGORITHMS` | ✅ (prod) | `["RS256"]` | Allowed JWT algorithms. |
+| `AUTH_ROLE_CLAIM_PATH` | Optional | `roles` | Dot path to extract role claims from the JWT. |
+| `BYPASS_AUTH` | Dev only | `false` | When `true`, skips auth and injects a `SYSTEM_BYPASS` role. |
+| `AUTH_JWKS_CACHE_TTL_SECONDS` | Optional | `300` | TTL for JWKS cache. |
+| `LOG_LEVEL` | Optional | `INFO` | Log verbosity. |
+| `ENVIRONMENT` | Optional | `development` | Included in logs and `/health` response. |
 
-Reference `docs/auth_testing.md` for detailed security configuration guidance and token generation tips.
+See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and bypass mode safety.
 
-## Running with Docker (Production/Sandboxed)
+---
 
-1.  **Build the Docker image:**
-    ```bash
-    docker build -t o-qt-mcp-server .
-    ```
+## Tool catalog
 
-2.  **Run the container:**
-    ```bash
-    docker run -d --name o-qt-mcp -p 8000:8000 --env-file .env o-qt-mcp-server
-    ```
+| Tool | Description |
+| --- | --- |
+| `run_qsar_workflow` | Executes the full QSAR assistant pipeline, returning structured JSON results, Markdown narrative, and a PDF report. |
 
-## Local Stack with Docker Compose
+### `run_qsar_workflow` parameters
 
-For end-to-end testing without a live OECD QSAR Toolbox instance, the repository includes a `docker-compose.yml` that pairs the MCP server with a lightweight Toolbox API stub.
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `identifier` | string | ✅ | Chemical identifier (name, CAS, or SMILES). |
+| `search_type` | enum(`name`, `cas`, `smiles`) | ✅ | How to interpret `identifier`. |
+| `context` | string | – | Free-form text describing the analysis context. |
+| `profiler_guids` | array[string] | – | Explicit profilers to run. |
+| `qsar_mode` | enum(`recommended`,`all`,`none`) | – | QSAR preset (defaults to curated `recommended`). |
+| `qsar_guids` | array[string] | – | Exact QSAR model GUIDs. |
+| `simulator_guids` | array[string] | – | Metabolism simulators to execute. |
+| `llm_provider` | string | – | Override LLM provider (e.g., `openai`, `openrouter`). |
+| `llm_model` | string | – | LLM model identifier. |
+| `llm_api_key` | string | – | API key when not provided via environment. |
+
+### Response payload
+
+```jsonc
+{
+  "status": "ok",
+  "identifier": "Acetone",
+  "summary_markdown": "...",
+  "log_json": { "...": "..." },
+  "pdf_report_base64": "JVBERi0xLjcKJ..."
+}
+```
+
+- `summary_markdown` – same narrative presented in the assistant UI.
+- `log_json` – comprehensive bundle (inputs, raw QSAR payloads, filtered data, agent outputs).
+- `pdf_report_base64` – base64-encoded, publication-ready PDF.
+
+---
+
+## Running the server
+
+### Local development (Poetry)
+
+```bash
+poetry install
+poetry run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Docker
+
+```bash
+docker build -t o-qt-mcp-server .
+docker run -d --name o-qt-mcp \
+  --env-file .env \
+  -p 8000:8000 \
+  o-qt-mcp-server
+```
+
+### Docker Compose (with Toolbox stub)
 
 ```bash
 docker compose up --build
 ```
 
-* `mcp-server` is built from the local Dockerfile and exposes port `8000`.
-* `toolbox-stub` is a placeholder service (ghcr.io/senseibelbi/qsar-toolbox-stub) listening on port `5000`.
-* The MCP container overrides `QSAR_TOOLBOX_API_URL` to reference the stub and sets `BYPASS_AUTH=true` for local development convenience. Adjust or remove these overrides when integrating with real infrastructure.
+This launches:
 
-To point at a real Toolbox deployment, update `QSAR_TOOLBOX_API_URL` in `.env` or via compose overrides, and disable authentication bypass.
+| Service | Purpose | Port |
+| --- | --- | --- |
+| `mcp-server` | The MCP server | 8000 |
+| `toolbox-stub` | Mock Toolbox WebAPI for demos | 5000 |
 
-## Security Hardening Checklist
+Update `.env` to point at a real Toolbox instance before production use.
 
-Before running in production:
+---
 
-1. Set `BYPASS_AUTH=false` and provide real OIDC issuer/audience settings.
-2. Rotate credentials and secrets via your orchestration platform (Kubernetes secrets, AWS Secrets Manager, etc.); avoid storing sensitive values in `.env`.
-3. Terminate TLS at a reverse proxy (e.g., Nginx, Envoy) in front of the MCP server, and restrict inbound ports.
-4. Tighten RBAC policies in `config/tool_permissions.default.json`, granting only required tools per role.
-5. Enable structured log forwarding and audit sinks using `docs/observability.md` guidance.
-6. Configure resource limits and health probes in your deployment platform; the Docker image already exposes `/health`.
+## Integrating with coding agents
 
-## Architecture Overview
+Follow [docs/integration_guides/mcp_integration.md](docs/integration_guides/mcp_integration.md) for step-by-step instructions covering:
 
-The server is built using FastAPI and Pydantic.
+- Claude Code / Cursor
+- Codex CLI
+- Gemini CLI
+- Generic MCP hosts
 
-*   `src/config/settings.py`: Centralized configuration management (Pydantic Settings).
-*   `src/mcp/`: Core MCP protocol handling (JSON-RPC router, protocol models).
-*   `src/auth/`: Authentication (OIDC) and Authorization (RBAC) services.
-*   `src/tools/`: Tool definitions, registry, and implementations.
+Each guide includes JSON snippets for provider configuration and tips for handling OAuth tokens.
 
-### MCP Capability Negotiation
+---
 
-The `/mcp` endpoint follows the JSON-RPC 2.0 transport used by MCP hosts:
+## Output artifacts
 
-* `initialize` – Clients send capabilities; the server returns `protocolVersion` (current value `2025-03-26`) and the features it supports. Tooling is enabled; resources, prompts, and sampling are disabled.
-* `initialized` – Notification acknowledged; no response body (HTTP 204).
-* `shutdown` / `exit` – Clean shutdown semantics. `exit` is treated as a no-op acknowledgement (HTTP 204).
+Every successful run returns three artifacts:
 
-Additional notes:
+1. **JSON log** – Raw payloads from the QSAR Toolbox plus the specialist agent outputs.
+2. **Markdown narrative** – Human-readable synthesis suitable for reports or version control.
+3. **PDF report** – Built with ReportLab; includes provenance tables, key study badges, and optional logo.
 
-* **Batch requests are not supported.** If the server receives a JSON array payload it responds with error code `-32600 (Invalid Request)`.
-* Notification requests (no `id`) return HTTP 204 with no body.
-* Successful calls that produce no payload return a JSON-RPC success response with `result: null`.
+Consumers can store the PDF by decoding `pdf_report_base64` from the tool response.
 
-## Next Steps
+---
 
-1.  **Implement QSAR Logic:** Implement the actual QSAR analysis logic within `src/tools/implementations/o_qt_qsar_tools.py`, connecting to the QSAR Toolbox Web API.
-2.  **Configure Security:** Define the precise RBAC roles in `src/auth/rbac.py` and ensure OIDC details in `.env` are correct. Set `BYPASS_AUTH=False` for production.
-3.  **Audit Logging:** Enhance the audit logging middleware in `src/api/server.py` to ensure immutable traceability (Section 2.3).
+## Security checklist
 
-Refer to:
-- `docs/auth_testing.md` for detailed OIDC configuration, token generation tips, and test utilities.
-- `docs/observability.md` for audit/correlation-id behaviour and guidance on wiring custom sinks.
-- `docs/testing.md` for local tooling, pytest commands, and CI details.
-- `docs/release_process.md` for the release checklist and tagging workflow.
-- `docs/integration_guides/mcp_integration.md` for instructions on connecting Claude Code, Codex CLI, Gemini CLI, and other MCP-aware agents.
+- ✅ Use OAuth2/OIDC in production (`BYPASS_AUTH=false`).
+- ✅ Terminate TLS at a reverse proxy.
+- ✅ Configure RBAC in `config/tool_permissions.default.json`.
+- ✅ Enable audit log shipping (see [docs/observability.md](docs/observability.md)).
+- ✅ Rotate secrets via platform-specific secret stores.
+- ✅ Regularly update the Docker base image (see [Dockerfile](Dockerfile)).
 
-## Release Management
+---
 
-We track releases in `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) conventions.
+## Development notes
 
-1. Update `CHANGELOG.md`, bump `pyproject.toml` version, and follow the checklist in `docs/release_process.md`.
-2. Tag releases using `git tag -a vX.Y.Z` and publish GitHub releases summarising the changes.
-3. Keep the `## [Unreleased]` section ready for future work after each release.
+| Command | Purpose |
+| --- | --- |
+| `poetry run pytest` | Run the full test suite. |
+| `poetry run pytest tests/auth -q` | Focus on authentication tests. |
+| `poetry run black . && poetry run isort .` | Format code. |
+| `docker compose up --build` | Local stack with Toolbox stub. |
+
+Additional documentation:
+
+- [docs/testing.md](docs/testing.md) – local tooling and CI details.
+- [docs/release_process.md](docs/release_process.md) – versioning and release checklist.
+- [docs/toolbox_webapi_overview.md](docs/toolbox_webapi_overview.md) – mapping MCP tools to Toolbox endpoints.
+
+---
+
+## Roadmap
+
+- Streaming progress updates over MCP notifications for long-running QSAR jobs.
+- Additional tools for ad-hoc discovery (e.g., list profilers, fetch model metadata without running full pipeline).
+- Optional job queue and persistence layer for asynchronous execution.
+
+Community feedback and pull requests are welcome—see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+---
+
+## License
+
+This project is released under the [MIT License](LICENSE).  
+
+_OECD QSAR Toolbox is proprietary software. Users must supply their own licensed installations and comply with the OECD EULA._
