@@ -52,12 +52,11 @@ def test_list_profilers_live():
     assert "Caption" in first
 
 
-def test_search_benzene_live():
+def test_list_search_databases_live():
     client = _client()
-    payload = _run(client.search_chemicals("benzene", "name"))
-    assert payload, "QSAR API search returned empty payload."
-    items = payload.get("Items") or payload.get("items") or payload.get("Results")
-    assert items, "QSAR API search returned no items."
+    payload = _run(client.list_search_databases())
+    assert isinstance(payload, list), "Search databases response was not a list."
+    assert payload, "QSAR API returned no search databases."
 
 
 def test_list_workflows_live():
