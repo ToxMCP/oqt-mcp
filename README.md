@@ -9,7 +9,7 @@ Chemical safety work often relies on the proprietary OECD QSAR Toolbox desktop a
 
 The O-QT MCP server turns that workflow into an **open, programmable interface**:
 
-- **Single MCP tool (`run_qsar_workflow`)** orchestrates the same multi-agent pipeline used in the O-QT AI Assistant.
+- **Single MCP tool (`run_oqt_multiagent_workflow`, formerly `run_qsar_workflow`)** orchestrates the same multi-agent pipeline used in the O-QT AI Assistant.
 - **Structured JSON + Markdown + PDF** responses are returned in one call, ready for downstream automation.
 - **Vendor-neutral** – any coding agent that speaks MCP can trigger analyses and capture outputs.
 
@@ -73,6 +73,9 @@ Once running, your MCP host connects to `http://localhost:8000/mcp`.
 | `AUTH_JWKS_CACHE_TTL_SECONDS` | Optional | `300` | TTL for JWKS cache. |
 | `LOG_LEVEL` | Optional | `INFO` | Log verbosity. |
 | `ENVIRONMENT` | Optional | `development` | Included in logs and `/health` response. |
+| `ASSISTANT_PROVIDER` | Optional | – | Set to `OpenAI` or `OpenRouter` to enable the legacy O-QT multi-agent workflow. |
+| `ASSISTANT_MODEL` | Optional | `gpt-4.1-nano` | LLM identifier to use when the assistant path is enabled. |
+| `ASSISTANT_API_KEY` | Optional | – | API key for the selected provider. Falls back to `OPENAI_API_KEY` / `OPENROUTER_API_KEY` if absent. |
 
 See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and bypass mode safety.
 
@@ -82,7 +85,7 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 
 | Tool | Description |
 | --- | --- |
-| `run_qsar_workflow` | Executes the full QSAR assistant pipeline, returning structured JSON results, Markdown narrative, and a PDF report. |
+| `run_oqt_multiagent_workflow` | Executes the full O-QT multi-agent pipeline (search + profiling + optional QSAR) and returns structured JSON results, Markdown narrative, and a PDF report. |
 | `list_profilers` | Lists profilers configured inside the OECD QSAR Toolbox. |
 | `get_profiler_info` | Provides metadata, categories, and literature links for a specific profiler. |
 | `list_simulators` | Lists metabolism simulators (e.g., liver, skin, microbial). |
@@ -106,7 +109,7 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `structure_connectivity` | Returns the connectivity string for the supplied SMILES. |
 | `render_pdf_from_log` | Generates the regulatory PDF from a stored comprehensive log (no rerun). |
 
-### `run_qsar_workflow` parameters
+### `run_oqt_multiagent_workflow` parameters
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -134,7 +137,10 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 ```
 
 - `summary_markdown` – same narrative presented in the assistant UI.
-- `log_json` – comprehensive bundle (inputs, raw QSAR payloads, filtered data, agent outputs).
+- `log_json` – comprehensive bundle. When the assistant workflow runs, the payload includes:  
+  - `assistant_session` (provider/model, duration, specialist outputs)  
+  - `mcp_workflow` (deterministic fallback summary and Toolbox metadata)  
+  - `analysis`, `data_retrieval`, and other sections reused by the original app.
 - `pdf_report_base64` – base64-encoded, publication-ready PDF.
 
 ---
@@ -148,6 +154,54 @@ poetry install
 poetry run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+### Quick MCP smoke test
+
+Once the server is running on `http://localhost:8000/mcp` (and your `.env` points to a reachable Toolbox WebAPI), the following curl invocations exercise the main tools with Benzene as an example:
+
+```bash
+# 1. Handshake and tool discovery
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}'
+
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"mcp/tool/list","params":{}}' | jq '.result.tools | length'
+
+# 2. Resolve Benzene and pull discovery metadata
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"mcp/tool/call","params":{"name":"search_chemicals","parameters":{"query":"Benzene","search_type":"name"}}}' | jq '.result[0]'
+
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":4,"method":"mcp/tool/call","params":{"name":"list_profilers","parameters":{}}}' | jq '.result.profilers[:5]'
+
+# 3. Execute profilers / QSAR workflow (uses chemId from the first search hit)
+BENZENE_CHEMID="019a0835-99ea-7828-a2a1-2821354f4753"
+PROFILER_GUID="a06271f5-944e-4892-b0ad-fa5f7217ec14"
+
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_profiler\",\"parameters\":{\"profiler_guid\":\"$PROFILER_GUID\",\"chem_id\":\"$BENZENE_CHEMID\"}}}" | jq '.result.result'
+
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_oqt_multiagent_workflow\",\"parameters\":{\"identifier\":\"Benzene\",\"search_type\":\"name\",\"profiler_guids\":[\"$PROFILER_GUID\"]}}}" | jq '{status: .result.status, summary: .result.summary_markdown, pdf_bytes: (.result.pdf_report_base64 | length)}'
+
+# 4. Optional helpers
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":7,"method":"mcp/tool/call","params":{"name":"canonicalize_structure","parameters":{"smiles":"c1ccccc1"}}}'
+```
+
+You should see:
+
+- Tool listing reporting 27 tools.
+- `search_chemicals` resolving Benzene to a Toolbox `chemId`.
+- Profiler execution returning the “Class 1 (narcosis or baseline toxicity)” call.
+- `run_oqt_multiagent_workflow` producing a Markdown summary along with a non-empty Base64 PDF payload (written to disk automatically when invoked via Codex, Claude, or Gemini CLIs).
+
 ### Docker
 
 ```bash
@@ -157,6 +211,18 @@ docker run -d --name o-qt-mcp \
   -p 8000:8000 \
   o-qt-mcp-server
 ```
+
+### Optional: Enable the legacy O-QT assistant workflow
+
+The MCP can reuse the multi-agent prompts and PDF template from the original O-QT assistant. Configure the following before starting the server:
+
+```bash
+export ASSISTANT_PROVIDER=OpenAI               # or OpenRouter
+export ASSISTANT_MODEL=gpt-4.1-nano            # any model supported by the provider
+export ASSISTANT_API_KEY=sk-...                # falls back to OPENAI_API_KEY/OPENROUTER_API_KEY
+```
+
+With these variables set, `run_oqt_multiagent_workflow` will call the same specialist agents used by the Streamlit app, return the full assistant transcript inside `log_json.assistant_session`, and embed the assistant-generated PDF in `pdf_report_base64`. If the assistant cannot run (missing key, upstream error, etc.) the MCP automatically falls back to the deterministic summary.
 
 ### Docker Compose (with Toolbox stub)
 

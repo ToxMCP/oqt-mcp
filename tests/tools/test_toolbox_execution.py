@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import io
+import json
 
 import pytest
 
@@ -122,7 +123,10 @@ def test_download_qsar_report(monkeypatch):
     monkeypatch.setattr(execution.qsar_client, "generate_qsar_report", fake_report)
 
     result = asyncio.run(execution.download_qsar_report("chem", "model", "note"))
-    assert result["report"]["comments"] == "note"
+    decoded = base64.b64decode(result["report_base64"]).decode("utf-8")
+    payload = json.loads(decoded)
+    assert payload["comments"] == "note"
+    assert result["size_bytes"] > 0
 
 
 def test_execute_workflow(monkeypatch):
@@ -142,7 +146,10 @@ def test_download_workflow_report(monkeypatch):
     monkeypatch.setattr(execution.qsar_client, "workflow_report", fake_workflow_report)
 
     result = asyncio.run(execution.download_workflow_report("chem", "wf", "note"))
-    assert result["report"]["comments"] == "note"
+    decoded = base64.b64decode(result["report_base64"]).decode("utf-8")
+    payload = json.loads(decoded)
+    assert payload["comments"] == "note"
+    assert result["size_bytes"] > 0
 
 
 def test_group_chemicals(monkeypatch):

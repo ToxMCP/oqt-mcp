@@ -39,8 +39,13 @@ class JSONRPCResponse(BaseModel):
     error: Optional[JSONRPCError] = None
     id: str | int | None = None
 
+    model_config = {"extra": "forbid", "populate_by_name": True, "exclude_none": True}
+
     @model_validator(mode="before")
     def check_consistency(cls, values):
+        if not isinstance(values, dict):
+            return values
+            
         # Must not have both result and error
         if (
             "error" in values
@@ -74,9 +79,15 @@ class InitializeParams(BaseModel):
     capabilities: Dict[str, Any] = Field(default_factory=dict)
 
 
+class ServerInfo(BaseModel):
+    name: str
+    version: Optional[str] = None
+
+
 class InitializeResult(BaseModel):
     protocolVersion: str = Field(..., alias="protocolVersion")
-    features: Dict[str, FeatureSupport]
+    serverInfo: ServerInfo = Field(..., alias="serverInfo")
+    capabilities: Dict[str, FeatureSupport]
 
 
 # Tools and Resources (Section 1.3, Section 3.1)
@@ -86,7 +97,9 @@ class InitializeResult(BaseModel):
 class ToolDefinition(BaseModel):
     name: str
     description: str
-    parameters: Dict[str, Any]  # JSON Schema object definition
+    inputSchema: Dict[str, Any] = Field(..., alias="inputSchema")  # JSON Schema object definition
+    
+    model_config = {"populate_by_name": True}
 
 
 class ListToolsResult(BaseModel):

@@ -35,11 +35,19 @@ Replace with `http://localhost:8000/mcp` if running locally.
 }
 ```
 
-3. Reload the MCP session; Claude Code should list the “O-QT MCP Server” toolset. Invoke tools such as `run_qsar_workflow` directly from the chat sidebar and download any returned PDF attachments.
+3. Reload the MCP session; Claude Code should list the “O-QT MCP Server” toolset. Invoke tools such as `run_oqt_multiagent_workflow` (formerly `run_qsar_workflow`) directly from the chat sidebar and download any returned PDF attachments.
+
+Note on transports: use `type: "http"`. Do not set `type: "sse"` unless the server explicitly documents SSE support for MCP. This server exposes a JSON‑RPC HTTP endpoint at `/mcp` and does not require SSE for normal operation.
 
 ### Local Development Tip
 
-When running both Claude and the MCP server locally, use `http://localhost:8000/mcp`. If Claude runs inside a container, expose the host port and update the URL accordingly.
+When running both Claude and the MCP server locally, use `http://localhost:8000/mcp`. If Claude runs inside a container, expose the host port and update the URL accordingly. To enable the multi-agent assistant output, set the following environment variables before launching the MCP server:
+
+```bash
+export ASSISTANT_PROVIDER=OpenAI        # or OpenRouter
+export ASSISTANT_MODEL=gpt-4.1-nano     # optional override
+export ASSISTANT_API_KEY=sk-...         # falls back to OPENAI_API_KEY / OPENROUTER_API_KEY
+```
 
 ## Codex CLI (OpenAI MCP client)
 
@@ -64,7 +72,11 @@ When running both Claude and the MCP server locally, use `http://localhost:8000/
 
 ```bash
 codex tools list
-codex tools call oqt-mcp run_qsar_workflow --identifier "Acetone" --search-type name
+codex tools call oqt-mcp run_oqt_multiagent_workflow --identifier "Acetone" --search-type name
+codex tools call oqt-mcp list_profilers | jq '.profilers[:5]'
+codex tools call oqt-mcp search_chemicals --query "Benzene" --search-type name | jq '.[0].ChemId'
+# use the returned chemId in subsequent calls
+codex tools call oqt-mcp run_profiler --profiler-guid a06271f5-944e-4892-b0ad-fa5f7217ec14 --chem-id "<CHEMID_FROM_SEARCH>"
 ```
 
 If the tool returns binary payloads (PDF), Codex CLI stores them in the outputs directory (displayed in the command response).
@@ -91,8 +103,10 @@ If the tool returns binary payloads (PDF), Codex CLI stores them in the outputs 
 
 ```bash
 gemini mcp providers
-gemini mcp call oqt-mcp run_qsar_workflow --identifier "Acetone"
+gemini mcp call oqt-mcp run_oqt_multiagent_workflow --identifier "Acetone"
 ```
+
+If the assistant integration is enabled on the server, `log_json.assistant_session` in the response will contain the full transcript of specialist agents and the combined PDF will match the original Streamlit application.
 
 ## Other MCP Hosts
 
@@ -106,7 +120,8 @@ gemini mcp call oqt-mcp run_qsar_workflow --identifier "Acetone"
 2. Invoke `server.ping` or `server.getStatus` (depending on host implementation) to confirm connectivity.
 3. Run discovery calls such as `list_profilers`, `list_simulators`, or `list_qsar_models` to verify Toolbox connectivity.
 4. Execute granular tools (`run_qsar_model`, `run_profiler`, `run_metabolism_simulator`) to confirm GUID-based operations succeed.
-5. Trigger the full workflow (`run_qsar_workflow`) with a simple identifier and verify the JSON response plus generated PDF.
+5. Trigger the full workflow (`run_oqt_multiagent_workflow`) with a simple identifier and verify the JSON response plus generated PDF.
+   - When the assistant path is active, check `result.assistant.enabled` and `result.log_json.assistant_session` to confirm the multi-agent prompts executed successfully.
 
 ## Frequently Asked Questions
 

@@ -1,6 +1,8 @@
 import base64
+import json
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
+import inspect
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -9,6 +11,67 @@ from src.tools.registry import tool_registry
 from src.utils.pdf_generator import generate_pdf_report
 
 log = logging.getLogger(__name__)
+
+
+def _ensure_bytes(payload: Optional[object]) -> bytes:
+    if payload is None:
+        return b""
+    if isinstance(payload, (bytes, bytearray)):
+        return bytes(payload)
+    if isinstance(payload, memoryview):
+        return payload.tobytes()
+    if isinstance(payload, str):
+        return payload.encode("utf-8")
+    if isinstance(payload, (dict, list)):
+        return json.dumps(payload).encode("utf-8")
+    raise TypeError("Unexpected binary payload type")
+
+
+def _format_meta(label: str, meta: Dict[str, Any]) -> Dict[str, Any]:
+    if not meta:
+        return None
+    return {
+        "endpoint": label,
+        "attempts": meta.get("attempts"),
+        "duration_ms": meta.get("duration_ms"),
+        "timeout_profile": meta.get("timeout_profile"),
+        "status_code": meta.get("status_code"),
+    }
+
+
+def _aggregate_meta(*entries: Dict[str, Any]) -> Dict[str, Any]:
+    calls = [entry for entry in entries if entry]
+    total = round(
+        sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3
+    ) if calls else 0.0
+    return {"calls": calls, "total_duration_ms": total}
+
+
+async def _invoke_with_meta(func, *args, **kwargs):
+    try:
+        result = await func(*args, with_meta=True, **kwargs)
+    except TypeError:
+        filtered_kwargs = kwargs
+        try:
+            signature = inspect.signature(func)
+            filtered_kwargs = {
+                key: value
+                for key, value in kwargs.items()
+                if key in signature.parameters
+            }
+        except (TypeError, ValueError):
+            filtered_kwargs = kwargs
+        result = await func(*args, **filtered_kwargs)
+        return result, None
+    if isinstance(result, tuple) and len(result) == 2:
+        return result
+    return result, None
+
+
+def _attach_toolbox(result: Dict[str, Any], meta: Dict[str, Any]) -> Dict[str, Any]:
+    if meta.get("calls"):
+        result["toolbox"] = meta
+    return result
 
 
 class QsarApplyParams(BaseModel):
@@ -91,35 +154,48 @@ class PdfFromLogParams(BaseModel):
 
 async def run_qsar_model(qsar_guid: str, chem_id: str) -> dict:
     try:
-        prediction = await qsar_client.apply_qsar_model(qsar_guid, chem_id)
-        domain = await qsar_client.get_qsar_domain(qsar_guid, chem_id)
+        prediction, apply_meta = await _invoke_with_meta(
+            qsar_client.apply_qsar_model, qsar_guid, chem_id
+        )
+        domain, domain_meta = await _invoke_with_meta(
+            qsar_client.get_qsar_domain, qsar_guid, chem_id
+        )
     except QsarClientError as exc:
         log.error("QSAR apply failed: %s", exc)
         raise
-    return {
+    toolbox_meta = _aggregate_meta(
+        _format_meta("qsar/apply", apply_meta),
+        _format_meta("qsar/domain", domain_meta),
+    )
+    result = {
         "qsar_guid": qsar_guid,
         "chem_id": chem_id,
         "prediction": prediction,
         "domain": domain,
     }
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def run_profiler(
     profiler_guid: str, chem_id: str, simulator_guid: Optional[str] = None
 ) -> dict:
     try:
-        result = await qsar_client.profile_with_profiler(
-            profiler_guid, chem_id, simulator_guid
+        result, meta = await _invoke_with_meta(
+            qsar_client.profile_with_profiler, profiler_guid, chem_id, simulator_guid
         )
     except QsarClientError as exc:
         log.error("Profiler execution failed: %s", exc)
         raise
-    return {
+    result = {
         "profiler_guid": profiler_guid,
         "chem_id": chem_id,
         "simulator_guid": simulator_guid,
         "result": result,
     }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("profiling/execute", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def run_metabolism_simulator(
@@ -127,93 +203,167 @@ async def run_metabolism_simulator(
 ) -> dict:
     try:
         if chem_id:
-            result = await qsar_client.simulate_metabolites_for_chem(
-                simulator_guid, chem_id
+            result, meta = await _invoke_with_meta(
+                qsar_client.simulate_metabolites_for_chem, simulator_guid, chem_id
             )
         else:
-            result = await qsar_client.simulate_metabolites_for_smiles(
-                simulator_guid, smiles or ""
+            result, meta = await _invoke_with_meta(
+                qsar_client.simulate_metabolites_for_smiles, simulator_guid, smiles or ""
             )
     except QsarClientError as exc:
         log.error("Metabolism simulator failed: %s", exc)
         raise
-    return {
+    result = {
         "simulator_guid": simulator_guid,
         "chem_id": chem_id,
         "smiles": smiles,
         "result": result,
     }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("metabolism/simulate", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def download_qmrf(qsar_guid: str, chem_id: str) -> dict:
     try:
-        payload = await qsar_client.generate_qmrf(qsar_guid)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.generate_qmrf, qsar_guid
+        )
     except QsarClientError as exc:
         log.error("QMRF retrieval failed: %s", exc)
         raise
-    return {"qsar_guid": qsar_guid, "chem_id": chem_id, "qmrf": payload}
+    result = {
+        "qsar_guid": qsar_guid,
+        "chem_id": chem_id,
+        "qmrf": payload,
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("report/qmrf", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def download_qsar_report(
     chem_id: str, qsar_guid: str, comments: Optional[str]
 ) -> dict:
     try:
-        payload = await qsar_client.generate_qsar_report(
-            chem_id, qsar_guid, comments or ""
+        payload, meta = await _invoke_with_meta(
+            qsar_client.generate_qsar_report, chem_id, qsar_guid, comments or ""
         )
     except QsarClientError as exc:
         log.error("QSAR report retrieval failed: %s", exc)
         raise
-    return {"chem_id": chem_id, "qsar_guid": qsar_guid, "report": payload}
+    pdf_bytes = _ensure_bytes(payload)
+    encoded = base64.b64encode(pdf_bytes).decode("utf-8")
+    result = {
+        "chem_id": chem_id,
+        "qsar_guid": qsar_guid,
+        "report_base64": encoded,
+        "size_bytes": len(pdf_bytes),
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("report/qsar", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def execute_workflow(workflow_guid: str, chem_id: str) -> dict:
     try:
-        result = await qsar_client.execute_workflow(workflow_guid, chem_id)
+        result, meta = await _invoke_with_meta(
+            qsar_client.execute_workflow, workflow_guid, chem_id
+        )
     except QsarClientError as exc:
         log.error("Workflow execution failed: %s", exc)
         raise
-    return {"workflow_guid": workflow_guid, "chem_id": chem_id, "result": result}
+    result = {
+        "workflow_guid": workflow_guid,
+        "chem_id": chem_id,
+        "result": result,
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("workflows/execute", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def download_workflow_report(
     chem_id: str, workflow_guid: str, comments: Optional[str]
 ) -> dict:
     try:
-        payload = await qsar_client.workflow_report(
-            chem_id, workflow_guid, comments or ""
+        payload, meta = await _invoke_with_meta(
+            qsar_client.workflow_report, chem_id, workflow_guid, comments or ""
         )
     except QsarClientError as exc:
         log.error("Workflow report retrieval failed: %s", exc)
         raise
-    return {"chem_id": chem_id, "workflow_guid": workflow_guid, "report": payload}
+    pdf_bytes = _ensure_bytes(payload)
+    encoded = base64.b64encode(pdf_bytes).decode("utf-8")
+    result = {
+        "chem_id": chem_id,
+        "workflow_guid": workflow_guid,
+        "report_base64": encoded,
+        "size_bytes": len(pdf_bytes),
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("report/workflow", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def group_chemicals(chem_id: str, profiler_guid: str) -> dict:
     try:
-        payload = await qsar_client.group_by_profiler(chem_id, profiler_guid)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.group_by_profiler, chem_id, profiler_guid
+        )
     except QsarClientError as exc:
-        log.error("Grouping failed: %s", exc)
+        log.warning("Grouping failed for %s/%s: %s", chem_id, profiler_guid, exc)
         raise
-    return {"chem_id": chem_id, "profiler_guid": profiler_guid, "group": payload}
+    result = {
+        "chem_id": chem_id,
+        "profiler_guid": profiler_guid,
+        "group": payload,
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("grouping/profile", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def canonicalize_structure(smiles: str) -> dict:
     try:
-        payload = await qsar_client.canonicalize_structure(smiles)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.canonicalize_structure, smiles
+        )
     except QsarClientError as exc:
         log.error("Structure canonicalization failed: %s", exc)
         raise
-    return {"smiles": smiles, "canonical": payload}
+    result = {
+        "smiles": smiles,
+        "canonical": payload,
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("structure/canonize", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def structure_connectivity(smiles: str) -> dict:
     try:
-        payload = await qsar_client.get_connectivity(smiles)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_connectivity, smiles
+        )
     except QsarClientError as exc:
         log.error("Structure connectivity failed: %s", exc)
         raise
-    return {"smiles": smiles, "connectivity": payload}
+    result = {
+        "smiles": smiles,
+        "connectivity": payload,
+    }
+    toolbox_meta = _aggregate_meta(
+        _format_meta("structure/connectivity", meta),
+    )
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def render_pdf_from_log(log: dict, filename: Optional[str] = None) -> dict:

@@ -510,6 +510,125 @@
         "dependencies": [],
         "priority": "low",
         "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "Harden Toolbox HTTP resilience",
+        "description": "Improve robustness of QSAR Toolbox client calls by tuning timeouts, adding retries, and limiting concurrent heavy requests.",
+        "details": "- Introduce per-endpoint timeout profiles (light vs heavy) in `src/qsar/client.py` and update defaults for heavy routes such as grouping and workflow execution.\n- Add bounded exponential backoff with jitter for retryable status codes (500/502/503/504) and read timeouts on idempotent requests.\n- Gate heavy Toolbox operations behind an asyncio semaphore to avoid saturating the remote instance.\n- Surface retry counts and Toolbox RTT in tool responses for observability.",
+        "testStrategy": "- Unit tests using httpx MockTransport to verify retry behaviour, timeout selection, and semaphore enforcement.\n- Integration smoke test invoking a known heavy endpoint to ensure requests complete within the new budget.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Standardize MCP tool response contract",
+        "description": "Return structured status metadata and artifact envelopes for every tool so agents can react to degraded scenarios.",
+        "details": "- Update tool implementations to emit `{status, correlation_id, latency_ms, toolbox}` along with data payloads.\n- Wrap binary artifacts in a consistent envelope including filename, mime type, base64, size_bytes, and hash.\n- Treat Toolbox 204 responses (e.g., empty workflow reports) as `status=degraded` with a human-readable reason.\n- Propagate correlation IDs from middleware into tool results.",
+        "testStrategy": "- Add unit tests covering success, degraded, and error responses to confirm schema.\n- Extend README/integration guide with response contract examples.",
+        "status": "done",
+        "dependencies": [
+          18
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 20,
+        "title": "Implement workflow execution fallback",
+        "description": "Provide a resilient path for long-running Toolbox workflows by introducing job-style orchestration and task handles.",
+        "details": "- Investigate Toolbox support for async job APIs; if unavailable, create a controller that polls the Toolbox server-side and returns a task handle to MCP clients.\n- Expose new endpoints to query job status and retrieve results, falling back to retries with graceful degradation when the Toolbox is unresponsive.\n- Document the contract for clients, including polling cadence and cancellation semantics.",
+        "testStrategy": "- Integration tests simulating long-running workflows with mocked latency.\n- Unit tests verifying job state transitions and error propagation.",
+        "status": "done",
+        "dependencies": [
+          18,
+          19
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 21,
+        "title": "Enhance observability and guardrails",
+        "description": "Expose metrics and protective mechanisms to monitor Toolbox health and prevent cascading failures.",
+        "details": "- Emit Prometheus metrics for per-tool latency, success/degraded/error counts, retry totals, and Toolbox RTT.\n- Implement a simple circuit breaker that opens after configurable consecutive failures/timeouts and closes after a cool-down.\n- Include correlation IDs and retry metadata in audit logs to aid incident response.",
+        "testStrategy": "- Unit tests for circuit breaker state transitions.\n- Manual verification of Prometheus endpoint metrics using curl or promtool.",
+        "status": "pending",
+        "dependencies": [
+          18
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 22,
+        "title": "Expand compatibility and automated tests",
+        "description": "Guard against regressions by widening the Python support matrix and adding high-level smoke tests.",
+        "details": "- Update CI to run against Python 3.10, 3.11, and 3.13, matching the Poetry runtime selection.\n- Add a smoke test script that exercises key MCP tools (model run, profiler, workflow, artifact download) against a mocked Toolbox or sandbox environment.\n- Ensure README documents the expanded matrix and how to run the smoke suite locally.",
+        "testStrategy": "- CI pipeline verification with GitHub Actions or equivalent.\n- Local run of the smoke script to confirm expected outcomes.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 23,
+        "title": "Document operations and integration guidance",
+        "description": "Refresh documentation and runbooks so users understand degraded modes, smoke tests, and production hardening steps.",
+        "details": "- Expand README and integration guide with the new smoke test workflow, response contract, and artifact handling notes.\n- Add an SRE runbook covering correlation-id based debugging, circuit breaker behaviour, and heavy-endpoint mitigation.\n- Document production auth expectations (disable BYPASS_AUTH, required OIDC settings).",
+        "testStrategy": "- Documentation review with peers; ensure instructions reproduce the smoke test.\n- Link runbook from repo README/docs.",
+        "status": "pending",
+        "dependencies": [
+          18,
+          19,
+          21
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 24,
+        "title": "Integrate O-QT assistant LLM workflow",
+        "description": "Allow run_oqt_multiagent_workflow to reuse the legacy oqt_assistant prompts and specialist agents when LLM credentials are provided.",
+        "details": "- Extract reusable helpers from O-QT-pro/batch_reports.py (or package oqt_assistant) so the MCP server can invoke the same multi-agent pipeline.\n- Load prompts from oqt_assistant/utils/prompts.yaml and initialise providers based on env vars or tool parameters (OpenAI/OpenRouter support).\n- Inject the assistant-generated Markdown narrative and specialist outputs into the workflow response and log bundle while preserving the deterministic fallback when no keys are supplied.",
+        "testStrategy": "- Add unit tests stubbing the oqt_assistant entry point to confirm the MCP workflow passes the correct payload and records assistant outputs.\n- Provide an integration smoke test (recorded or mocked) that exercises the LLM path and verifies the PDF contains assistant content.",
+        "status": "pending",
+        "dependencies": [
+          18,
+          19
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 25,
+        "title": "Surface assistant transcripts in workflow artifacts",
+        "description": "Augment workflow log_json and PDF artefacts to capture assistant prompts, decisions, and provenance alongside Toolbox metadata.",
+        "details": "- Extend the workflow log schema to include an assistant_session section with prompt names, model identifiers, and summarised outputs.\n- Update the PDF generator so assistant-driven narratives render exactly as the oqt_assistant application produces them, with clear fallback messaging when the LLM path is unavailable.\n- Ensure binary artefact envelopes (base64, size, hash) remain unchanged for MCP clients.",
+        "testStrategy": "- Snapshot-based tests confirming assistant_session inclusion and PDF structure when assistant output is present vs fallback.\n- Regression tests ensuring existing PDF generation still succeeds when no LLM output is provided.",
+        "status": "pending",
+        "dependencies": [
+          24
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 26,
+        "title": "Document optional assistant configuration for MCP users",
+        "description": "Explain how to enable the LLM-enhanced workflow via MCP, covering environment variables, agent setup, and fallbacks.",
+        "details": "- Update README and docs/integration_guides/mcp_integration.md with instructions for supplying OpenAI/OpenRouter credentials, selecting models, and expected outputs.\n- Provide sample MCP calls (e.g., Gemini CLI) demonstrating both the assistant-enabled run and the raw Toolbox tool usage.\n- Highlight security considerations (secret storage, BYPASS_AUTH warnings) and troubleshooting steps for missing credentials.",
+        "testStrategy": "- Documentation walkthrough ensuring a new user can enable the assistant path end-to-end.\n- Peer review or linting (markdown-link-check) to verify references remain valid.",
+        "status": "pending",
+        "dependencies": [
+          24,
+          25,
+          23
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {

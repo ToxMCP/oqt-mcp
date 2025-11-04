@@ -19,6 +19,7 @@ setup_logging()
 import src.tools.implementations.o_qt_qsar_tools
 import src.tools.implementations.toolbox_discovery
 import src.tools.implementations.toolbox_execution
+import src.tools.implementations.workflow_runner
 
 # Import routers
 from src.mcp.router import router as mcp_router

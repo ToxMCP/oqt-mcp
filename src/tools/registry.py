@@ -42,7 +42,7 @@ class ToolRegistry:
 
         self._tools[name] = {
             "definition": ToolDefinition(
-                name=name, description=description, parameters=parameters_schema
+                name=name, description=description, inputSchema=parameters_schema
             ),
             "implementation": implementation,
             "parameters_model": parameters_model,

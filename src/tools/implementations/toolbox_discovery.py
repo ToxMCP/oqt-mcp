@@ -1,3 +1,4 @@
+import inspect
 import logging
 from typing import Any, Dict, List
 
@@ -45,87 +46,164 @@ async def _safe_list_response(payload: Any) -> List[Dict[str, Any]]:
     return []
 
 
+def _format_meta(label: str, meta: Dict[str, Any] | None) -> Dict[str, Any] | None:
+    if not meta:
+        return None
+    return {
+        "endpoint": label,
+        "attempts": meta.get("attempts"),
+        "duration_ms": meta.get("duration_ms"),
+        "timeout_profile": meta.get("timeout_profile"),
+        "status_code": meta.get("status_code"),
+    }
+
+
+def _aggregate_meta(entry: Dict[str, Any] | None) -> Dict[str, Any]:
+    calls = [entry] if entry else []
+    total = round(
+        sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3
+    ) if calls else 0.0
+    return {"calls": calls, "total_duration_ms": total}
+
+
+async def _invoke_with_meta(func, *args, **kwargs):
+    try:
+        result = await func(*args, with_meta=True, **kwargs)
+    except TypeError:
+        filtered_kwargs = kwargs
+        try:
+            signature = inspect.signature(func)
+            filtered_kwargs = {
+                key: value
+                for key, value in kwargs.items()
+                if key in signature.parameters
+            }
+        except (TypeError, ValueError):
+            filtered_kwargs = kwargs
+        result = await func(*args, **filtered_kwargs)
+        return result, None
+    if isinstance(result, tuple) and len(result) == 2:
+        return result
+    return result, None
+
+
+def _attach_toolbox(result: Dict[str, Any], meta: Dict[str, Any]) -> Dict[str, Any]:
+    if meta.get("calls"):
+        result["toolbox"] = meta
+    return result
+
+
 async def list_profilers() -> Dict[str, Any]:
     try:
-        data = await qsar_client.list_profilers()
+        data, meta = await _invoke_with_meta(qsar_client.list_profilers)
     except QsarClientError as exc:
         log.error("Failed to list profilers: %s", exc)
         raise
-    return {"profilers": await _safe_list_response(data)}
+    profilers = await _safe_list_response(data)
+    toolbox_meta = _aggregate_meta(_format_meta("profiling/list", meta))
+    result = {"profilers": profilers}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def get_profiler_info(profiler_guid: str) -> Dict[str, Any]:
     try:
-        data = await qsar_client.get_profiler_info(profiler_guid)
+        data, meta = await _invoke_with_meta(
+            qsar_client.get_profiler_info, profiler_guid
+        )
     except QsarClientError as exc:
         log.error("Failed to fetch profiler info (%s): %s", profiler_guid, exc)
         raise
-    return {"profiler": data}
+    toolbox_meta = _aggregate_meta(_format_meta("profiling/info", meta))
+    result = {"profiler": data}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def list_simulators() -> Dict[str, Any]:
     try:
-        data = await qsar_client.list_simulators()
+        data, meta = await _invoke_with_meta(qsar_client.list_simulators)
     except QsarClientError as exc:
         log.error("Failed to list simulators: %s", exc)
         raise
-    return {"simulators": await _safe_list_response(data)}
+    simulators = await _safe_list_response(data)
+    toolbox_meta = _aggregate_meta(_format_meta("metabolism/list", meta))
+    result = {"simulators": simulators}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def get_simulator_info(simulator_guid: str) -> Dict[str, Any]:
     try:
-        data = await qsar_client.get_simulator_info(simulator_guid)
+        data, meta = await _invoke_with_meta(
+            qsar_client.get_simulator_info, simulator_guid
+        )
     except QsarClientError as exc:
         log.error("Failed to fetch simulator info (%s): %s", simulator_guid, exc)
         raise
-    return {"simulator": data}
+    toolbox_meta = _aggregate_meta(_format_meta("metabolism/info", meta))
+    result = {"simulator": data}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def list_calculators() -> Dict[str, Any]:
     try:
-        data = await qsar_client.list_calculators()
+        data, meta = await _invoke_with_meta(qsar_client.list_calculators)
     except QsarClientError as exc:
         log.error("Failed to list calculators: %s", exc)
         raise
-    return {"calculators": await _safe_list_response(data)}
+    calculators = await _safe_list_response(data)
+    toolbox_meta = _aggregate_meta(_format_meta("calculation/list", meta))
+    result = {"calculators": calculators}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def get_calculator_info(calculator_guid: str) -> Dict[str, Any]:
     try:
-        data = await qsar_client.get_calculator_info(calculator_guid)
+        data, meta = await _invoke_with_meta(
+            qsar_client.get_calculator_info, calculator_guid
+        )
     except QsarClientError as exc:
         log.error("Failed to fetch calculator info (%s): %s", calculator_guid, exc)
         raise
-    return {"calculator": data}
+    toolbox_meta = _aggregate_meta(_format_meta("calculation/info", meta))
+    result = {"calculator": data}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def get_endpoint_tree() -> Dict[str, Any]:
     try:
-        data = await qsar_client.get_endpoint_tree()
+        data, meta = await _invoke_with_meta(qsar_client.get_endpoint_tree)
     except QsarClientError as exc:
         log.error("Failed to fetch endpoint tree: %s", exc)
         raise
     tree = data if isinstance(data, list) else []
-    return {"endpoint_tree": tree}
+    toolbox_meta = _aggregate_meta(_format_meta("data/endpointtree", meta))
+    result = {"endpoint_tree": tree}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def get_metadata_hierarchy() -> Dict[str, Any]:
     try:
-        data = await qsar_client.get_metadata_hierarchy()
+        data, meta = await _invoke_with_meta(qsar_client.get_metadata_hierarchy)
     except QsarClientError as exc:
         log.error("Failed to fetch metadata hierarchy: %s", exc)
         raise
     hierarchy = data if isinstance(data, list) else []
-    return {"metadata_hierarchy": hierarchy}
+    toolbox_meta = _aggregate_meta(_format_meta("data/metadatahierarchy", meta))
+    result = {"metadata_hierarchy": hierarchy}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def list_qsar_models(position: str) -> Dict[str, Any]:
     try:
-        models = await qsar_client.list_qsar_models(position)
+        models, meta = await _invoke_with_meta(qsar_client.list_qsar_models, position)
     except QsarClientError as exc:
         log.error("Failed to list QSAR models for %s: %s", position, exc)
         raise
-    return {"position": position, "models": await _safe_list_response(models)}
+    toolbox_meta = _aggregate_meta(_format_meta("qsar/list", meta))
+    result = {
+        "position": position,
+        "models": await _safe_list_response(models),
+    }
+    return _attach_toolbox(result, toolbox_meta)
 
 
 async def list_all_qsar_models() -> Dict[str, Any]:
@@ -139,12 +217,14 @@ async def list_all_qsar_models() -> Dict[str, Any]:
 
 async def list_search_databases() -> Dict[str, Any]:
     try:
-        data = await qsar_client.list_search_databases()
+        data, meta = await _invoke_with_meta(qsar_client.list_search_databases)
     except QsarClientError as exc:
         log.error("Failed to list search databases: %s", exc)
         raise
     databases = data if isinstance(data, list) else []
-    return {"databases": databases}
+    toolbox_meta = _aggregate_meta(_format_meta("search/databases", meta))
+    result = {"databases": databases}
+    return _attach_toolbox(result, toolbox_meta)
 
 
 def register_discovery_tools() -> None:

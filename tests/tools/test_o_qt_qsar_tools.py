@@ -68,6 +68,8 @@ def test_generate_metabolites(monkeypatch):
     monkeypatch.setattr(qsar_tools.qsar_client, "generate_metabolites", fake_generate)
 
     result = asyncio.run(qsar_tools.generate_metabolites("CCO", "Liver"))
-    assert result["Simulated"] is True
-    assert result["Simulator"] == "Liver"
-    assert result["SMILES"] == "CCO"
+    assert result["smiles"] == "CCO"
+    assert result["simulator_guid"] == "Liver"
+    assert result["metabolites"]["Simulated"] is True
+    assert result["metabolites"]["Simulator"] == "Liver"
+    assert result["metabolites"]["SMILES"] == "CCO"
