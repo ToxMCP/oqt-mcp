@@ -26,34 +26,34 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 try:
-    from oqt_assistant.utils.qsar_api import (
-        QSARToolboxAPI,
-        SearchOptions,
-        QSARResponseError,
-    )
-    from oqt_assistant.utils.llm_utils import (
-        analyze_chemical_context,
-        analyze_physical_properties,
-        analyze_environmental_fate,
-        analyze_profiling_reactivity,
-        analyze_experimental_data,
-        analyze_metabolism,
-        analyze_qsar_predictions,
-        analyze_read_across,
-        synthesize_report,
-    )
     from oqt_assistant.utils.data_formatter import (
         process_experimental_metadata,
         process_qsar_predictions,
     )
-    from oqt_assistant.utils.qsar_models import (
-        run_qsar_predictions,
-        derive_recommended_qsar_models,
-        RECOMMENDED_QSAR_LIMIT,
-    )
-    from oqt_assistant.utils.qprf_enrichment import QPRFEnricher
     from oqt_assistant.utils.hit_selection import select_hit_with_properties
+    from oqt_assistant.utils.llm_utils import (
+        analyze_chemical_context,
+        analyze_environmental_fate,
+        analyze_experimental_data,
+        analyze_metabolism,
+        analyze_physical_properties,
+        analyze_profiling_reactivity,
+        analyze_qsar_predictions,
+        analyze_read_across,
+        synthesize_report,
+    )
     from oqt_assistant.utils.pdf_generator import generate_pdf_report
+    from oqt_assistant.utils.qprf_enrichment import QPRFEnricher
+    from oqt_assistant.utils.qsar_api import (
+        QSARResponseError,
+        QSARToolboxAPI,
+        SearchOptions,
+    )
+    from oqt_assistant.utils.qsar_models import (
+        RECOMMENDED_QSAR_LIMIT,
+        derive_recommended_qsar_models,
+        run_qsar_predictions,
+    )
 
     ASSISTANT_IMPORTED = True
 except ImportError:  # pragma: no cover - executed when optional dependency missing
@@ -64,8 +64,16 @@ MAX_METABOLITES_PER_SIMULATOR = 50
 
 MODEL_PRESETS = {
     "gpt-4.1": {"max_tokens": 10_000, "temperature": 0.10, "reasoning_effort": None},
-    "gpt-4.1-mini": {"max_tokens": 10_000, "temperature": 0.10, "reasoning_effort": None},
-    "gpt-4.1-nano": {"max_tokens": 8_000, "temperature": 0.10, "reasoning_effort": None},
+    "gpt-4.1-mini": {
+        "max_tokens": 10_000,
+        "temperature": 0.10,
+        "reasoning_effort": None,
+    },
+    "gpt-4.1-nano": {
+        "max_tokens": 8_000,
+        "temperature": 0.10,
+        "reasoning_effort": None,
+    },
 }
 
 
@@ -130,7 +138,11 @@ def resolve_assistant_config(
         api_key_override
         or os.getenv("ASSISTANT_API_KEY")
         or (os.getenv("OPENAI_API_KEY") if provider.lower() == "openai" else None)
-        or (os.getenv("OPENROUTER_API_KEY") if provider.lower() == "openrouter" else None)
+        or (
+            os.getenv("OPENROUTER_API_KEY")
+            if provider.lower() == "openrouter"
+            else None
+        )
     )
 
     if not api_key:
@@ -160,13 +172,18 @@ def resolve_assistant_config(
         try:
             temperature = float(temperature)
         except ValueError:
-            logger.warning("Invalid ASSISTANT_TEMPERATURE value '%s'; using preset default.", temperature)
+            logger.warning(
+                "Invalid ASSISTANT_TEMPERATURE value '%s'; using preset default.",
+                temperature,
+            )
             temperature = preset["temperature"] if preset else 0.1
 
     if temperature is None:
         temperature = preset["temperature"] if preset else 0.1
 
-    reasoning_effort = reasoning_effort_override or os.getenv("ASSISTANT_REASONING_EFFORT")
+    reasoning_effort = reasoning_effort_override or os.getenv(
+        "ASSISTANT_REASONING_EFFORT"
+    )
     api_base = os.getenv("ASSISTANT_API_BASE")
 
     if provider.lower() == "openrouter" and not api_base:
@@ -320,12 +337,24 @@ async def _run_agents(
     qsar_processed = bundle.get("qsar_models", {}).get("processed", {})
 
     tasks = [
-        asyncio.create_task(analyze_physical_properties(props, analysis_context, llm_config)),
-        asyncio.create_task(analyze_environmental_fate(props, analysis_context, llm_config)),
-        asyncio.create_task(analyze_profiling_reactivity(profiling, analysis_context, llm_config)),
-        asyncio.create_task(analyze_experimental_data(exp_payload, analysis_context, llm_config)),
-        asyncio.create_task(analyze_metabolism(metabolism, analysis_context, llm_config)),
-        asyncio.create_task(analyze_qsar_predictions(qsar_processed, analysis_context, llm_config)),
+        asyncio.create_task(
+            analyze_physical_properties(props, analysis_context, llm_config)
+        ),
+        asyncio.create_task(
+            analyze_environmental_fate(props, analysis_context, llm_config)
+        ),
+        asyncio.create_task(
+            analyze_profiling_reactivity(profiling, analysis_context, llm_config)
+        ),
+        asyncio.create_task(
+            analyze_experimental_data(exp_payload, analysis_context, llm_config)
+        ),
+        asyncio.create_task(
+            analyze_metabolism(metabolism, analysis_context, llm_config)
+        ),
+        asyncio.create_task(
+            analyze_qsar_predictions(qsar_processed, analysis_context, llm_config)
+        ),
     ]
     labels = [
         "Physical_Properties",
@@ -379,7 +408,9 @@ async def _run_agents(
     return final_report, specialist_outputs
 
 
-def _normalise_simulator_catalog(simulators: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+def _normalise_simulator_catalog(
+    simulators: List[Dict[str, Any]]
+) -> List[Tuple[str, str]]:
     normalised = []
     for entry in simulators or []:
         guid = entry.get("Guid") or entry.get("GUID") or entry.get("guid")
@@ -402,9 +433,7 @@ def _filter_simulators(
         return available
     requested_lower = {guid.lower() for guid in requested_guids}
     filtered = [
-        (name, guid)
-        for name, guid in available
-        if guid.lower() in requested_lower
+        (name, guid) for name, guid in available if guid.lower() in requested_lower
     ]
     return filtered
 
@@ -424,8 +453,12 @@ def _filter_qsar_models(
         if guid_filter and guid_lower in guid_filter:
             continue
         caption_lower = (entry.get("Caption") or "").lower()
-        position_lower = (entry.get("RequestedPosition") or entry.get("Position") or "").lower()
-        if substrings and any(sub in caption_lower or sub in position_lower for sub in substrings):
+        position_lower = (
+            entry.get("RequestedPosition") or entry.get("Position") or ""
+        ).lower()
+        if substrings and any(
+            sub in caption_lower or sub in position_lower for sub in substrings
+        ):
             continue
         filtered.append(entry)
     return filtered
@@ -449,7 +482,11 @@ def _fetch_qsar_bundle(
     qsar_total_budget_s: Optional[int],
 ) -> Tuple[Dict[str, Any], str, str, List[str]]:
     normalised_search = (search_type or "auto").strip().lower()
-    logger.info("  [Data Fetch] Searching Toolbox for '%s' (mode=%s)", identifier, normalised_search)
+    logger.info(
+        "  [Data Fetch] Searching Toolbox for '%s' (mode=%s)",
+        identifier,
+        normalised_search,
+    )
 
     hits: List[Dict[str, Any]] = []
     search_attempts: List[str] = []
@@ -480,9 +517,15 @@ def _fetch_qsar_bundle(
     if not hits:
         raise RuntimeError(f"No Toolbox structures matched '{identifier}'.")
 
-    selected_basic, props, chem_id, _notes = select_hit_with_properties(api, identifier, hits, logger=logger)
+    selected_basic, props, chem_id, _notes = select_hit_with_properties(
+        api, identifier, hits, logger=logger
+    )
 
-    metabolism_data: Dict[str, Any] = {"status": "Skipped", "simulations": {}, "available_simulators": []}
+    metabolism_data: Dict[str, Any] = {
+        "status": "Skipped",
+        "simulations": {},
+        "available_simulators": [],
+    }
     simulator_guids_used: List[str] = []
 
     if enable_metabolism:
@@ -499,7 +542,9 @@ def _fetch_qsar_bundle(
 
         if not to_run:
             metabolism_data["status"] = "Skipped"
-            metabolism_data["note"] = "Metabolism enabled but no matching simulators available."
+            metabolism_data["note"] = (
+                "Metabolism enabled but no matching simulators available."
+            )
         else:
             logger.info("  [Data Fetch] Running %d metabolism simulators.", len(to_run))
             completed = 0
@@ -539,7 +584,9 @@ def _fetch_qsar_bundle(
         metabolism_data["status"] = "Skipped"
         metabolism_data["note"] = "Metabolism simulation disabled."
 
-    logger.info("  [Data Fetch] Retrieving experimental data and profiling information.")
+    logger.info(
+        "  [Data Fetch] Retrieving experimental data and profiling information."
+    )
     enrichment = {}
     try:
         enricher = QPRFEnricher(api)
@@ -550,10 +597,17 @@ def _fetch_qsar_bundle(
     except Exception as exc:
         logger.warning("QPRF enrichment failed (non critical): %s", exc)
 
-    experimental = process_experimental_metadata(api.get_all_chemical_data(chem_id, include_metadata=True) or [])
+    experimental = process_experimental_metadata(
+        api.get_all_chemical_data(chem_id, include_metadata=True) or []
+    )
     profiling = api.get_chemical_profiling(chem_id) or {}
 
-    raw_qsar = {"catalog_size": 0, "executed_models": 0, "predictions": [], "summary": {"total": 0}}
+    raw_qsar = {
+        "catalog_size": 0,
+        "executed_models": 0,
+        "predictions": [],
+        "summary": {"total": 0},
+    }
     qsar_processed = process_qsar_predictions([])
 
     if include_qsar:
@@ -564,11 +618,22 @@ def _fetch_qsar_bundle(
                 preset_guids = selected_qsar_guids
             elif fast_qsar or (qsar_limit and qsar_limit > 0):
                 snapshot = api.get_all_qsar_models_catalog() or []
-                snapshot = _filter_qsar_models(snapshot, exclude_qsar_guids, exclude_qsar_contains)
-                limit = qsar_limit if (qsar_limit and qsar_limit > 0) else RECOMMENDED_QSAR_LIMIT
+                snapshot = _filter_qsar_models(
+                    snapshot, exclude_qsar_guids, exclude_qsar_contains
+                )
+                limit = (
+                    qsar_limit
+                    if (qsar_limit and qsar_limit > 0)
+                    else RECOMMENDED_QSAR_LIMIT
+                )
                 recommended = derive_recommended_qsar_models(snapshot, limit=limit)
-                preset_guids = [entry.get("Guid") for entry in recommended if entry.get("Guid")]
-                logger.info("  [QSAR] Using recommended preset of %d models.", len(preset_guids or []))
+                preset_guids = [
+                    entry.get("Guid") for entry in recommended if entry.get("Guid")
+                ]
+                logger.info(
+                    "  [QSAR] Using recommended preset of %d models.",
+                    len(preset_guids or []),
+                )
 
             raw_qsar = run_qsar_predictions(
                 api,
@@ -593,9 +658,17 @@ def _fetch_qsar_bundle(
         "qsar_models": {"raw": raw_qsar, "processed": qsar_processed},
         "context": context_str,
         "_internal_meta": {"simulator_guids_used": simulator_guids_used},
-        "qprf_metadata": {"software": enrichment, "enrichment_applied": bool(enrichment)},
+        "qprf_metadata": {
+            "software": enrichment,
+            "enrichment_applied": bool(enrichment),
+        },
     }
-    return bundle, chem_id, selected_basic.get("SubstanceName") or identifier, simulator_guids_used
+    return (
+        bundle,
+        chem_id,
+        selected_basic.get("SubstanceName") or identifier,
+        simulator_guids_used,
+    )
 
 
 async def generate_assistant_output(
@@ -620,7 +693,9 @@ async def generate_assistant_output(
     Runs the full oqt_assistant data collection + LLM pipeline and returns the artefacts.
     """
     if not is_available():
-        raise RuntimeError("oqt_assistant is not installed; assistant workflow unavailable.")
+        raise RuntimeError(
+            "oqt_assistant is not installed; assistant workflow unavailable."
+        )
 
     start = time.time()
     api = QSARToolboxAPI(base_url=qsar_base_url)
@@ -646,7 +721,10 @@ async def generate_assistant_output(
     _clear_agent_caches()
 
     final_report, specialist_outputs = await _run_agents(
-        bundle, identifier=preferred_name or chem_id or identifier, context=bundle["context"], llm_config=llm_cfg
+        bundle,
+        identifier=preferred_name or chem_id or identifier,
+        context=bundle["context"],
+        llm_config=llm_cfg,
     )
     log_bundle = _build_log(
         identifier=preferred_name or identifier,

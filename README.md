@@ -13,7 +13,9 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 - **Structured JSON + Markdown + PDF** responses are returned in one call, ready for downstream automation.
 - **Vendor-neutral** – any coding agent that speaks MCP can trigger analyses and capture outputs.
 
-> Looking for the original assistant? The MCP server reuses the same core logic from [O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant) but wraps it in a secure, headless API designed for automation.
+> Looking for the original assistant UI? See [O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant). The MCP server reuses the same core logic but wraps it in a secure, headless API designed for automation.
+>
+> Related publication: [Artificial intelligence for integrated chemical safety assessment using OECD QSAR Toolbox](https://doi.org/10.1016/j.comtox.2025.100395).
 
 ---
 
@@ -32,15 +34,16 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 ## Table of contents
 
 1. [Quick start](#quick-start)
-2. [Configuration](#configuration)
-3. [Tool catalog](#tool-catalog)
-4. [Running the server](#running-the-server)
-5. [Integrating with coding agents](#integrating-with-coding-agents)
-6. [Output artifacts](#output-artifacts)
-7. [Security checklist](#security-checklist)
-8. [Development notes](#development-notes)
-9. [Roadmap](#roadmap)
-10. [License](#license)
+2. [Related resources](#related-resources)
+3. [Configuration](#configuration)
+4. [Tool catalog](#tool-catalog)
+5. [Running the server](#running-the-server)
+6. [Integrating with coding agents](#integrating-with-coding-agents)
+7. [Output artifacts](#output-artifacts)
+8. [Security checklist](#security-checklist)
+9. [Development notes](#development-notes)
+10. [Roadmap](#roadmap)
+11. [License](#license)
 
 ---
 
@@ -48,7 +51,7 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 
 ```bash
 git clone https://github.com/senseibelbi/O_QT_MCP.git
-cd o-qt-mcp-server
+cd O_QT_MCP/o-qt-mcp-server
 poetry install
 cp .env.example .env
 poetry run uvicorn src.api.server:app --reload
@@ -57,6 +60,13 @@ poetry run uvicorn src.api.server:app --reload
 > **Important:** The server needs access to a running OECD QSAR Toolbox WebAPI instance (typically on a Windows host). Set `QSAR_TOOLBOX_API_URL` in `.env` to point to it.
 
 Once running, your MCP host connects to `http://localhost:8000/mcp`.
+
+---
+
+## Related resources
+
+- **Original interactive UI (Streamlit app):** [VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant)
+- **Peer-reviewed publication:** [Artificial intelligence for integrated chemical safety assessment using OECD QSAR Toolbox](https://doi.org/10.1016/j.comtox.2025.100395)
 
 ---
 
@@ -291,6 +301,7 @@ Additional documentation:
 - [docs/testing.md](docs/testing.md) – local tooling and CI details.
 - [docs/release_process.md](docs/release_process.md) – versioning and release checklist.
 - [docs/toolbox_webapi_overview.md](docs/toolbox_webapi_overview.md) – mapping MCP tools to Toolbox endpoints.
+- [SECURITY.md](SECURITY.md) – vulnerability reporting policy.
 
 ---
 
@@ -300,7 +311,7 @@ Additional documentation:
 - Additional tools for ad-hoc discovery (e.g., list profilers, fetch model metadata without running full pipeline).
 - Optional job queue and persistence layer for asynchronous execution.
 
-Community feedback and pull requests are welcome—see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Community feedback and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for details.
 
 ---
 

@@ -237,7 +237,9 @@ def _looks_like_mcp_content(result: Any) -> bool:
         return (
             isinstance(result, dict)
             and isinstance(result.get("content"), list)
-            and all(isinstance(item, dict) and "type" in item for item in result["content"])
+            and all(
+                isinstance(item, dict) and "type" in item for item in result["content"]
+            )
         )
     except Exception:
         return False
@@ -247,26 +249,36 @@ async def handle_call_tool(params: dict, user: User) -> Any:
     """Handles 'mcp/tool/call' requests."""
     tool_name = params.get("name")
     tool_params = params.get("parameters", {})
-    
+
     # Log the incoming request for debugging
-    log.debug(f"Tool call request - name: {tool_name}, params keys: {list(params.keys())}, parameters: {tool_params}")
+    log.debug(
+        f"Tool call request - name: {tool_name}, params keys: {list(params.keys())}, parameters: {tool_params}"
+    )
 
     if not tool_name or not isinstance(tool_name, str):
         raise JSONRPCDispatchError(
             INVALID_PARAMS, "Tool 'name' is missing or invalid in the request."
         )
-    
+
     # Handle different parameter formats from various MCP clients
     if not tool_params or tool_params == {}:
         # Check for 'arguments' key (used by some MCP clients like Gemini CLI)
-        if 'arguments' in params and isinstance(params['arguments'], dict):
-            log.debug(f"Using 'arguments' key for tool '{tool_name}': {params['arguments']}")
-            tool_params = params['arguments']
+        if "arguments" in params and isinstance(params["arguments"], dict):
+            log.debug(
+                f"Using 'arguments' key for tool '{tool_name}': {params['arguments']}"
+            )
+            tool_params = params["arguments"]
         else:
             # Check if there are other keys besides 'name', 'parameters', 'arguments' that could be the actual parameters
-            potential_params = {k: v for k, v in params.items() if k not in ['name', 'parameters', 'arguments']}
+            potential_params = {
+                k: v
+                for k, v in params.items()
+                if k not in ["name", "parameters", "arguments"]
+            }
             if potential_params:
-                log.debug(f"Using top-level parameters for tool '{tool_name}': {potential_params}")
+                log.debug(
+                    f"Using top-level parameters for tool '{tool_name}': {potential_params}"
+                )
                 tool_params = potential_params
 
     try:

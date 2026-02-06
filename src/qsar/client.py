@@ -63,7 +63,9 @@ class QsarClient:
         with_meta: bool = False,
     ) -> Any:
         url_path = path if path.startswith("/") else f"/{path}"
-        profile = timeout_profile if timeout_profile in self._timeout_profiles else "light"
+        profile = (
+            timeout_profile if timeout_profile in self._timeout_profiles else "light"
+        )
         timeout_config = self._timeout_profiles[profile]
         max_attempts = max(1, self._max_attempts.get(profile, 2))
 
@@ -88,7 +90,11 @@ class QsarClient:
                         response = await client.request(
                             method, url_path, params=params, json=json
                         )
-                except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.WriteTimeout) as exc:
+                except (
+                    httpx.ReadTimeout,
+                    httpx.ConnectTimeout,
+                    httpx.WriteTimeout,
+                ) as exc:
                     last_exception = exc
                     log.warning(
                         "QSAR client timeout (%s) for %s %s attempt %s/%s",
@@ -111,14 +117,11 @@ class QsarClient:
                 else:
                     if response.status_code >= 400:
                         is_retryable = response.status_code in self._retry_status_codes
-                        log_message = (
-                            "QSAR API error %s %s -> %s: %s"
-                            % (
-                                method,
-                                url_path,
-                                response.status_code,
-                                response.text[:200],
-                            )
+                        log_message = "QSAR API error %s %s -> %s: %s" % (
+                            method,
+                            url_path,
+                            response.status_code,
+                            response.text[:200],
                         )
                         if is_retryable and attempts < max_attempts:
                             log.warning("%s (retrying)", log_message)
@@ -236,9 +239,7 @@ class QsarClient:
         self, profiler_guid: str, *, with_meta: bool = False
     ) -> Any:
         encoded = quote(profiler_guid)
-        return await self._get(
-            f"/api/v6/profiling/{encoded}/info", with_meta=with_meta
-        )
+        return await self._get(f"/api/v6/profiling/{encoded}/info", with_meta=with_meta)
 
     async def list_simulators(self, *, with_meta: bool = False) -> Any:
         return await self._get("/api/v6/metabolism", with_meta=with_meta)
@@ -255,9 +256,7 @@ class QsarClient:
         return await self._get("/api/v6/data/endpointtree", with_meta=with_meta)
 
     async def get_metadata_hierarchy(self, *, with_meta: bool = False) -> Any:
-        return await self._get(
-            "/api/v6/data/metadatahierarchy", with_meta=with_meta
-        )
+        return await self._get("/api/v6/data/metadatahierarchy", with_meta=with_meta)
 
     async def search_chemicals(
         self,
@@ -532,14 +531,14 @@ class QsarClient:
         self, smiles: str, simulator_guid: str, *, with_meta: bool = False
     ) -> Any:
         if not simulator_guid:
-            raise QsarClientError("A simulator GUID is required to generate metabolites.")
+            raise QsarClientError(
+                "A simulator GUID is required to generate metabolites."
+            )
         return await self.simulate_metabolites_for_smiles(
             simulator_guid, smiles, with_meta=with_meta
         )
 
-    async def profile_chemical(
-        self, chem_id: str, *, with_meta: bool = False
-    ) -> Any:
+    async def profile_chemical(self, chem_id: str, *, with_meta: bool = False) -> Any:
         encoded = quote(chem_id)
         return await self._get(
             f"/api/v6/profiling/all/{encoded}",
@@ -557,9 +556,7 @@ class QsarClient:
     ) -> Any:
         encoded_prof = quote(profiler_guid)
         encoded_chem = quote(chem_id)
-        encoded_sim = (
-            quote(simulator_guid) if simulator_guid else NO_SIMULATOR_GUID
-        )
+        encoded_sim = quote(simulator_guid) if simulator_guid else NO_SIMULATOR_GUID
         path = f"/api/v6/profiling/{encoded_prof}/{encoded_chem}/{encoded_sim}"
         return await self._get(path, with_meta=with_meta)
 

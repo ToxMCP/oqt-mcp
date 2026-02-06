@@ -45,7 +45,7 @@ class JSONRPCResponse(BaseModel):
     def check_consistency(cls, values):
         if not isinstance(values, dict):
             return values
-            
+
         # Must not have both result and error
         if (
             "error" in values
@@ -97,8 +97,10 @@ class InitializeResult(BaseModel):
 class ToolDefinition(BaseModel):
     name: str
     description: str
-    inputSchema: Dict[str, Any] = Field(..., alias="inputSchema")  # JSON Schema object definition
-    
+    inputSchema: Dict[str, Any] = Field(
+        ..., alias="inputSchema"
+    )  # JSON Schema object definition
+
     model_config = {"populate_by_name": True}
 
 

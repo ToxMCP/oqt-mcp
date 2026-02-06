@@ -60,9 +60,11 @@ def _format_meta(label: str, meta: Dict[str, Any] | None) -> Dict[str, Any] | No
 
 def _aggregate_meta(entry: Dict[str, Any] | None) -> Dict[str, Any]:
     calls = [entry] if entry else []
-    total = round(
-        sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3
-    ) if calls else 0.0
+    total = (
+        round(sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3)
+        if calls
+        else 0.0
+    )
     return {"calls": calls, "total_duration_ms": total}
 
 

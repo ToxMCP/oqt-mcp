@@ -12,8 +12,8 @@ services:
     environment:
       # Override QSAR Toolbox URL to point at the stub container by default.
       QSAR_TOOLBOX_API_URL: http://toolbox-stub:5000
-      # Development convenience: toggle to false when integrating with real auth.
-      BYPASS_AUTH: "true"
+      # Secure default for public deployments. Override to true for local-only smoke tests.
+      BYPASS_AUTH: "${BYPASS_AUTH:-false}"
     depends_on:
       - toolbox-stub
     ports:

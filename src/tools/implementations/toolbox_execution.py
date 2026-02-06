@@ -1,8 +1,8 @@
 import base64
+import inspect
 import json
 import logging
 from typing import Any, Dict, Optional
-import inspect
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -41,9 +41,11 @@ def _format_meta(label: str, meta: Dict[str, Any]) -> Dict[str, Any]:
 
 def _aggregate_meta(*entries: Dict[str, Any]) -> Dict[str, Any]:
     calls = [entry for entry in entries if entry]
-    total = round(
-        sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3
-    ) if calls else 0.0
+    total = (
+        round(sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3)
+        if calls
+        else 0.0
+    )
     return {"calls": calls, "total_duration_ms": total}
 
 
@@ -208,7 +210,9 @@ async def run_metabolism_simulator(
             )
         else:
             result, meta = await _invoke_with_meta(
-                qsar_client.simulate_metabolites_for_smiles, simulator_guid, smiles or ""
+                qsar_client.simulate_metabolites_for_smiles,
+                simulator_guid,
+                smiles or "",
             )
     except QsarClientError as exc:
         log.error("Metabolism simulator failed: %s", exc)
@@ -227,9 +231,7 @@ async def run_metabolism_simulator(
 
 async def download_qmrf(qsar_guid: str, chem_id: str) -> dict:
     try:
-        payload, meta = await _invoke_with_meta(
-            qsar_client.generate_qmrf, qsar_guid
-        )
+        payload, meta = await _invoke_with_meta(qsar_client.generate_qmrf, qsar_guid)
     except QsarClientError as exc:
         log.error("QMRF retrieval failed: %s", exc)
         raise
@@ -350,9 +352,7 @@ async def canonicalize_structure(smiles: str) -> dict:
 
 async def structure_connectivity(smiles: str) -> dict:
     try:
-        payload, meta = await _invoke_with_meta(
-            qsar_client.get_connectivity, smiles
-        )
+        payload, meta = await _invoke_with_meta(qsar_client.get_connectivity, smiles)
     except QsarClientError as exc:
         log.error("Structure connectivity failed: %s", exc)
         raise

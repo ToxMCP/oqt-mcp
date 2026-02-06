@@ -1,8 +1,8 @@
 import base64
 import copy
+import inspect
 import logging
 from typing import Any, Dict, List, Optional
-import inspect
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -42,10 +42,12 @@ class WorkflowParams(BaseModel):
         description="Metabolism simulator GUIDs to execute for the resolved chemId.",
     )
     llm_provider: Optional[str] = Field(
-        None, description="Reserved for downstream LLM selection (not used server-side)."
+        None,
+        description="Reserved for downstream LLM selection (not used server-side).",
     )
     llm_model: Optional[str] = Field(
-        None, description="Reserved for downstream LLM selection (not used server-side)."
+        None,
+        description="Reserved for downstream LLM selection (not used server-side).",
     )
     llm_api_key: Optional[str] = Field(
         None,
@@ -86,7 +88,9 @@ def _coerce_hits(payload: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _format_meta(label: str, meta: Dict[str, Any] | None, **extra: Any) -> Dict[str, Any] | None:
+def _format_meta(
+    label: str, meta: Dict[str, Any] | None, **extra: Any
+) -> Dict[str, Any] | None:
     if not meta:
         return None
     entry = {
@@ -101,9 +105,11 @@ def _format_meta(label: str, meta: Dict[str, Any] | None, **extra: Any) -> Dict[
 
 
 def _aggregate_calls(calls: List[Dict[str, Any]]) -> Dict[str, Any]:
-    total = round(
-        sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3
-    ) if calls else 0.0
+    total = (
+        round(sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3)
+        if calls
+        else 0.0
+    )
     return {"calls": calls, "total_duration_ms": total}
 
 
@@ -188,8 +194,12 @@ async def run_oqt_multiagent_workflow(
         log.error(message)
         log_bundle["errors"].append(message)
         status = "error"
-        summary_lines.append(f"* Unable to resolve `{identifier_display}` in the Toolbox.")
-        return _build_workflow_response(status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls))
+        summary_lines.append(
+            f"* Unable to resolve `{identifier_display}` in the Toolbox."
+        )
+        return _build_workflow_response(
+            status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls)
+        )
 
     hits = _coerce_hits(search_payload)
     log_bundle["search_results"] = hits
@@ -203,7 +213,9 @@ async def run_oqt_multiagent_workflow(
         log.warning(message)
         log_bundle["errors"].append(message)
         summary_lines.append(f"* No Toolbox records matched `{identifier_display}`.")
-        return _build_workflow_response(status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls))
+        return _build_workflow_response(
+            status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls)
+        )
 
     primary = next((hit for hit in hits if hit.get("ChemId")), hits[0])
     chem_id = primary.get("ChemId")
@@ -225,9 +237,7 @@ async def run_oqt_multiagent_workflow(
             payload, profiler_meta = await qsar_client.profile_with_profiler(
                 profiler_guid, chem_id, None, with_meta=True
             )
-            profiler_results.append(
-                {"profiler_guid": profiler_guid, "result": payload}
-            )
+            profiler_results.append({"profiler_guid": profiler_guid, "result": payload})
             entry = _format_meta(
                 "profiling/execute", profiler_meta, profiler_guid=profiler_guid
             )
@@ -302,12 +312,8 @@ async def run_oqt_multiagent_workflow(
                     "domain": domain,
                 }
             )
-            entry_apply = _format_meta(
-                "qsar/apply", apply_meta, qsar_guid=qsar_guid
-            )
-            entry_domain = _format_meta(
-                "qsar/domain", domain_meta, qsar_guid=qsar_guid
-            )
+            entry_apply = _format_meta("qsar/apply", apply_meta, qsar_guid=qsar_guid)
+            entry_domain = _format_meta("qsar/domain", domain_meta, qsar_guid=qsar_guid)
             if entry_apply:
                 toolbox_calls.append(entry_apply)
             if entry_domain:
@@ -338,7 +344,9 @@ async def run_oqt_multiagent_workflow(
         log_bundle["toolbox"] = toolbox_meta
 
     if assistant_config:
-        default_context = context or "Publication-grade hazard assessment (MCP workflow)"
+        default_context = (
+            context or "Publication-grade hazard assessment (MCP workflow)"
+        )
         include_qsar = bool(qsar_guids) or qsar_mode not in {"none", "", "off", "skip"}
         fast_qsar = qsar_mode in {"recommended", "auto"} and not qsar_guids
         qsar_limit = len(qsar_guids) if qsar_guids else None
@@ -369,7 +377,9 @@ async def run_oqt_multiagent_workflow(
                 "model": assistant_config.model,
                 "duration_s": round(assistant_result.duration_s, 3),
             }
-        except Exception as exc:  # pragma: no cover - requires optional assistant install
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - requires optional assistant install
             assistant_error = str(exc)
             log.warning(
                 "Assistant workflow failed; falling back to deterministic summary: %s",

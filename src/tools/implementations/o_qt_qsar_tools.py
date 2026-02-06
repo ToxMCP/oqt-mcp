@@ -1,6 +1,6 @@
+import inspect
 import logging
 import uuid
-import inspect
 from typing import Any, Dict
 
 from pydantic import BaseModel, Field
@@ -73,9 +73,11 @@ def _format_meta(label: str, meta: Dict[str, Any] | None) -> Dict[str, Any] | No
 
 def _aggregate_meta(*entries: Dict[str, Any] | None) -> Dict[str, Any]:
     calls = [entry for entry in entries if entry]
-    total = round(
-        sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3
-    ) if calls else 0.0
+    total = (
+        round(sum(call.get("duration_ms", 0.0) or 0.0 for call in calls), 3)
+        if calls
+        else 0.0
+    )
     return {"calls": calls, "total_duration_ms": total}
 
 
@@ -110,7 +112,9 @@ async def get_public_qsar_model_info(model_id: str) -> dict:
     """Retrieves information about a specific QSAR model."""
     log.info(f"Fetching QSAR model info for ID: {model_id}")
     try:
-        payload, meta = await _invoke_with_meta(qsar_client.get_model_metadata, model_id)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_model_metadata, model_id
+        )
     except QsarClientError as exc:
         log.error("Failed to retrieve QSAR model info: %s", exc)
         raise
@@ -248,14 +252,14 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
     profiling_payload = None
     endpoint_meta = None
     profiling_meta = None
-    
+
     # Track availability status
     data_availability = {
         "endpoint_data_available": False,
         "profiling_data_available": False,
-        "warnings": []
+        "warnings": [],
     }
-    
+
     try:
         endpoint_payload, endpoint_meta = await _invoke_with_meta(
             qsar_client.get_endpoint_data,
@@ -267,14 +271,16 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
     except QsarClientError as exc:
         error_msg = str(exc)
         log.warning("Endpoint data retrieval failed for %s: %s", chem_id, error_msg)
-        
+
         if "404" in error_msg:
             warning = f"No endpoint data found for '{endpoint}' in the QSAR Toolbox database. This chemical may not have experimental data for this endpoint, or the endpoint name may need adjustment."
             data_availability["warnings"].append(warning)
             summary["endpoint_error"] = warning
         else:
             summary["endpoint_error"] = f"API error: {error_msg}"
-            data_availability["warnings"].append(f"Endpoint data retrieval failed: {error_msg}")
+            data_availability["warnings"].append(
+                f"Endpoint data retrieval failed: {error_msg}"
+            )
 
     try:
         profiling_payload, profiling_meta = await _invoke_with_meta(
@@ -284,26 +290,31 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
     except QsarClientError as exc:
         error_msg = str(exc)
         log.warning("Profiling retrieval failed for %s: %s", chem_id, error_msg)
-        
+
         if "404" in error_msg:
             warning = f"No profiling data found for this chemical in the QSAR Toolbox. The chemical may not be in the profiling database, or you may need to use a different identifier (try CAS number or SMILES)."
             data_availability["warnings"].append(warning)
             summary["profiling_error"] = warning
         else:
             summary["profiling_error"] = f"API error: {error_msg}"
-            data_availability["warnings"].append(f"Profiling retrieval failed: {error_msg}")
+            data_availability["warnings"].append(
+                f"Profiling retrieval failed: {error_msg}"
+            )
 
     summary["endpoint_data"] = endpoint_payload
     summary["profiling"] = profiling_payload
     summary["data_availability"] = data_availability
-    
+
     # Add helpful suggestions if no data was found
-    if not data_availability["endpoint_data_available"] and not data_availability["profiling_data_available"]:
+    if (
+        not data_availability["endpoint_data_available"]
+        and not data_availability["profiling_data_available"]
+    ):
         summary["suggestions"] = [
             "Try searching for the chemical first using 'search_chemicals' to verify it exists in the database",
             "If using a name, try the CAS number instead",
             "If using CAS, try the chemical name or SMILES structure",
-            "Check that the endpoint name matches available endpoints (use discovery tools to list endpoints)"
+            "Check that the endpoint name matches available endpoints (use discovery tools to list endpoints)",
         ]
     toolbox_meta = _aggregate_meta(
         _format_meta("search/auto", search_meta),
