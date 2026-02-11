@@ -1,5 +1,8 @@
 # O-QT MCP Server
 
+> Part of **ToxMCP** Suite → https://github.com/ToxMCP/toxmcp
+
+
 **Public MCP endpoint for the OECD QSAR Toolbox.**  
 Run QSAR workflows, stream structured outputs, and download audit-ready PDF reports through any MCP-aware agent (Claude Code, Codex CLI, Gemini CLI, etc.).
 
