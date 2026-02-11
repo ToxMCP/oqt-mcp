@@ -29,7 +29,7 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 
 > Looking for the original assistant UI? See [O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant). The MCP server reuses the same core logic but wraps it in a secure, headless API designed for automation.
 >
-> Related publication: [Artificial intelligence for integrated chemical safety assessment using OECD QSAR Toolbox](https://doi.org/10.1016/j.comtox.2025.100395).
+> Related publication: [O-QT assistant: a multi-agent AI system for streamlined chemical hazard assessment and read-across analysis using the OECD QSAR toolbox API](https://doi.org/10.1016/j.comtox.2025.100395).
 
 ---
 
