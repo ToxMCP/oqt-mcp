@@ -1,3 +1,7 @@
+[![CI](https://github.com/ToxMCP/oqt-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ToxMCP/oqt-mcp/actions/workflows/ci.yml)
+[![DOI](https://img.shields.io/badge/DOI-10.64898%2F2026.02.06.703989-blue)](https://doi.org/10.64898/2026.02.06.703989)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
+
 # O-QT MCP Server
 
 > Part of **ToxMCP** Suite → https://github.com/ToxMCP/toxmcp
@@ -323,3 +327,6 @@ Community feedback and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBU
 This project is released under the [Apache License 2.0](LICENSE).  
 
 _OECD QSAR Toolbox is proprietary software. Users must supply their own licensed installations and comply with the OECD EULA._
+## Acknowledgements / Origins
+
+This work was developed in the context of the **VHP4Safety** project and related efforts. It builds on upstream third-party data/services (see repository documentation for exact dependencies and access requirements).
