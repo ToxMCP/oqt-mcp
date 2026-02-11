@@ -61,6 +61,26 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 
 ---
 
+## Quickstart TL;DR
+
+```bash
+# 1) install
+poetry install
+
+# 2) configure
+cp .env.example .env
+# (set QSAR_TOOLBOX_API_URL in .env)
+
+# 3) run
+poetry run uvicorn src.api.server:app --reload --port 8001
+
+# 4) verify
+curl -s http://localhost:8001/health | jq .
+curl -s http://localhost:8001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq .
+```
+
 ## Quick start
 
 ```bash
