@@ -73,7 +73,7 @@ poetry run uvicorn src.api.server:app --reload
 
 > **Important:** The server needs access to a running OECD QSAR Toolbox WebAPI instance (typically on a Windows host). Set `QSAR_TOOLBOX_API_URL` in `.env` to point to it.
 
-Once running, your MCP host connects to `http://localhost:8000/mcp`.
+Once running, your MCP host connects to `http://localhost:8001/mcp`.
 
 ---
 
@@ -90,10 +90,10 @@ Once the server is running:
 
 ```bash
 # health
-curl -s http://localhost:8000/health | jq .
+curl -s http://localhost:8001/health | jq .
 
 # list MCP tools
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq .
 ```
@@ -194,24 +194,24 @@ poetry run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 
 ### Quick MCP smoke test
 
-Once the server is running on `http://localhost:8000/mcp` (and your `.env` points to a reachable Toolbox WebAPI), the following curl invocations exercise the main tools with Benzene as an example:
+Once the server is running on `http://localhost:8001/mcp` (and your `.env` points to a reachable Toolbox WebAPI), the following curl invocations exercise the main tools with Benzene as an example:
 
 ```bash
 # 1. Handshake and tool discovery
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}'
 
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":2,"method":"mcp/tool/list","params":{}}' | jq '.result.tools | length'
 
 # 2. Resolve Benzene and pull discovery metadata
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":3,"method":"mcp/tool/call","params":{"name":"search_chemicals","parameters":{"query":"Benzene","search_type":"name"}}}' | jq '.result[0]'
 
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":4,"method":"mcp/tool/call","params":{"name":"list_profilers","parameters":{}}}' | jq '.result.profilers[:5]'
 
@@ -219,16 +219,16 @@ curl -s http://localhost:8000/mcp \
 BENZENE_CHEMID="019a0835-99ea-7828-a2a1-2821354f4753"
 PROFILER_GUID="a06271f5-944e-4892-b0ad-fa5f7217ec14"
 
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_profiler\",\"parameters\":{\"profiler_guid\":\"$PROFILER_GUID\",\"chem_id\":\"$BENZENE_CHEMID\"}}}" | jq '.result.result'
 
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_oqt_multiagent_workflow\",\"parameters\":{\"identifier\":\"Benzene\",\"search_type\":\"name\",\"profiler_guids\":[\"$PROFILER_GUID\"]}}}" | jq '{status: .result.status, summary: .result.summary_markdown, pdf_bytes: (.result.pdf_report_base64 | length)}'
 
 # 4. Optional helpers
-curl -s http://localhost:8000/mcp \
+curl -s http://localhost:8001/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":7,"method":"mcp/tool/call","params":{"name":"canonicalize_structure","parameters":{"smiles":"c1ccccc1"}}}'
 ```
