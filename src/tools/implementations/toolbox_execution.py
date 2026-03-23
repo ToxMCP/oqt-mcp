@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, model_validator
 
 from src.qsar import QsarClientError, qsar_client
+from src.tools.implementations import workflow_runner
 from src.tools.registry import tool_registry
 from src.utils.pdf_generator import generate_pdf_report
 
@@ -151,6 +152,20 @@ class PdfFromLogParams(BaseModel):
     filename: Optional[str] = Field(
         None,
         description="Optional filename hint for downstream consumers (not used server-side).",
+    )
+
+
+class PortableHandoffsFromLogParams(BaseModel):
+    log: dict = Field(
+        ..., description="Stored O-QT log bundle captured from a workflow or grouping run."
+    )
+    workflow_type: str = Field(
+        "auto",
+        description="How to interpret the log (`auto`, `workflow`, or `grouping`).",
+    )
+    status: Optional[str] = Field(
+        None,
+        description="Optional status override (`ok`, `partial`, `not_found`, `error`) when the caller wants to pin the exported contract state.",
     )
 
 
@@ -388,6 +403,14 @@ async def render_pdf_from_log(log: dict, filename: Optional[str] = None) -> dict
     }
 
 
+async def build_portable_handoffs_from_log(
+    log: dict, workflow_type: str = "auto", status: Optional[str] = None
+) -> dict:
+    return workflow_runner.build_portable_handoffs_from_log_bundle(
+        log, workflow_type=workflow_type, status=status
+    )
+
+
 def register_execution_tools() -> None:
     tool_registry.register(
         name="run_qsar_model",
@@ -464,6 +487,13 @@ def register_execution_tools() -> None:
         description="Regenerates the regulatory PDF report from a stored log bundle (no Toolbox rerun).",
         parameters_model=PdfFromLogParams,
         implementation=render_pdf_from_log,
+    )
+
+    tool_registry.register(
+        name="build_portable_handoffs_from_log",
+        description="Reconstructs schema-aligned portable handoff objects from a stored O-QT log bundle (no Toolbox rerun).",
+        parameters_model=PortableHandoffsFromLogParams,
+        implementation=build_portable_handoffs_from_log,
     )
 
 

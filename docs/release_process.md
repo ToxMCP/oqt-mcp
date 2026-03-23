@@ -16,14 +16,18 @@ This guide describes how to cut releases for the O-QT MCP server, including sema
 2. **Run linters/formatters** (optional but recommended): `poetry run black .` and `poetry run isort .`.
 3. **Build Docker image**: `docker build -t o-qt-mcp-server .` (ensures the container still builds).
 4. **Update docs**:
-   - Ensure `README.md` reflects deployment instructions and configuration changes.
+   - Ensure `README.md` reflects deployment instructions, public-surface guidance, and the correct `ToxMCP/oqt-mcp` repository URL.
    - Update `CHANGELOG.md` with the additions/changes/fixes for this release.
-5. **Review security toggles**: confirm production defaults (`BYPASS_AUTH=false`, correct `QSAR_TOOLBOX_API_URL`).
-6. **Verify Taskmaster tasks**: close out completed tasks or capture follow-ups.
+   - Verify `docs/architecture.md`, `docs/integration_orchestrators.md`, and `schemas/README.md` still match the intended module boundary.
+5. **Validate portable contracts**:
+   - Run `poetry run pytest tests/test_portable_schemas.py -q`.
+   - Confirm schema examples still reflect the intended handoff objects for downstream orchestrators.
+6. **Review security toggles**: confirm production defaults (`BYPASS_AUTH=false`, correct `QSAR_TOOLBOX_API_URL`).
+7. **Verify Taskmaster tasks**: close out completed tasks or capture follow-ups.
 
 ## Publishing a Release
 
-1. Decide the new version (e.g., `v0.2.0`) and update `pyproject.toml` accordingly.
+1. Decide the new version (for example `v0.2.0`) and update `pyproject.toml` accordingly.
 2. Move entries from `## [Unreleased]` in `CHANGELOG.md` into a new section `## [x.y.z] - YYYY-MM-DD`.
 3. Commit changes with a message such as `chore: prepare v0.2.0 release`.
 4. Tag the commit:
@@ -31,7 +35,7 @@ This guide describes how to cut releases for the O-QT MCP server, including sema
    git tag -a v0.2.0 -m "O-QT MCP Server v0.2.0"
    git push origin v0.2.0
    ```
-5. Create a GitHub release for the new tag, pasting the changelog entry. Include links to documentation and any upgrade notes.
+5. Create a GitHub release for the new tag, pasting the changelog entry. Include links to `README.md`, `docs/architecture.md`, and `schemas/README.md` so downstream consumers can see the updated contract surface immediately.
 
 ## Post-release
 

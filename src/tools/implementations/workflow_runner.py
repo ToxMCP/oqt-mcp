@@ -1,10 +1,13 @@
 import base64
 import copy
+from datetime import datetime, timezone
 import inspect
 import logging
+import re
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.integrations import oqt_assistant
 from src.qsar import QsarClientError, qsar_client
@@ -12,6 +15,14 @@ from src.tools.registry import tool_registry
 from src.utils.pdf_generator import generate_pdf_report
 
 log = logging.getLogger(__name__)
+
+TOXMCP_REPOSITORY_URL = "https://github.com/ToxMCP/oqt-mcp"
+TOXMCP_HOMEPAGE_URL = "https://github.com/ToxMCP/toxmcp"
+TOOLBOX_SOURCE_SYSTEM = "OECD QSAR Toolbox WebAPI"
+TOOLBOX_COMPATIBILITY_NOTE = (
+    "Targets OECD QSAR Toolbox WebAPI /api/v6 compatibility routes."
+)
+GENERATED_BY_VERSION = "O-QT MCP Server v0.2.0"
 
 
 class WorkflowParams(BaseModel):
@@ -69,6 +80,94 @@ class WorkflowParams(BaseModel):
         return str(value).strip().lower()
 
 
+class GroupingJustificationParams(BaseModel):
+    identifier: str = Field(
+        ..., description="Target chemical identifier (common name, CAS number, or SMILES)."
+    )
+    search_type: str = Field(
+        "auto",
+        description="How to interpret the target identifier (`auto`, `name`, `cas`, `smiles`).",
+    )
+    problem_formulation: str = Field(
+        ...,
+        description="Problem formulation and intended use of the grouping or read-across exercise.",
+    )
+    decision_context: str = Field(
+        ...,
+        description="Decision context such as screening, hazard identification, or risk assessment.",
+    )
+    endpoints: List[str] = Field(
+        default_factory=list,
+        description="Endpoints that require justification in the grouping dossier.",
+    )
+    route_of_exposure: Optional[str] = Field(
+        None, description="Route of exposure relevant to the endpoints under consideration."
+    )
+    grouping_hypothesis: str = Field(
+        ...,
+        description="Hypothesis describing why the target and source chemicals are sufficiently similar.",
+    )
+    analogue_identifiers: List[str] = Field(
+        default_factory=list,
+        description="Candidate source analogue or category member identifiers to resolve in the Toolbox.",
+    )
+    analogue_search_type: str = Field(
+        "auto",
+        description="How to interpret the analogue identifiers (`auto`, `name`, `cas`, `smiles`).",
+    )
+    profiler_guids: List[str] = Field(
+        default_factory=list,
+        description="Profilers to execute as part of the similarity assessment.",
+    )
+    simulator_guids: List[str] = Field(
+        default_factory=list,
+        description="Metabolism simulators to execute for ADME/TK support.",
+    )
+    qsar_guids: List[str] = Field(
+        default_factory=list,
+        description="QSAR model GUIDs to execute as supporting evidence for the target substance.",
+    )
+    accepted_uncertainty_level: str = Field(
+        "medium",
+        description="Maximum residual uncertainty tolerated for the stated purpose (`low`, `medium`, `high`).",
+    )
+    context: Optional[str] = Field(
+        None, description="Optional extra narrative instructions for the generated dossier."
+    )
+
+    @field_validator("search_type", "analogue_search_type", mode="before")
+    @classmethod
+    def _normalise_search_modes(cls, value: Any) -> str:
+        if not value:
+            return "auto"
+        return str(value).strip().lower()
+
+    @field_validator("accepted_uncertainty_level", mode="before")
+    @classmethod
+    def _normalise_uncertainty_level(cls, value: Any) -> str:
+        if not value:
+            return "medium"
+        return str(value).strip().lower()
+
+    @field_validator("endpoints", mode="before")
+    @classmethod
+    def _coerce_endpoints(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return value
+        return [str(value)]
+
+    @model_validator(mode="after")
+    def _validate_endpoints(self):
+        self.endpoints = _unique(self.endpoints)
+        if not self.endpoints:
+            raise ValueError("Provide at least one endpoint.")
+        return self
+
+
 def _unique(values: List[str]) -> List[str]:
     seen = set()
     normalised: List[str] = []
@@ -86,6 +185,446 @@ def _coerce_hits(payload: Any) -> List[Dict[str, Any]]:
     if isinstance(payload, dict):
         return [payload]
     return []
+
+
+def _first_present(record: Dict[str, Any], candidates: List[str]) -> Any:
+    for candidate in candidates:
+        value = record.get(candidate)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _chemical_summary(hit: Dict[str, Any], identifier: str) -> Dict[str, Any]:
+    raw_names = hit.get("Names")
+    names = [str(name).strip() for name in raw_names if str(name).strip()] if isinstance(raw_names, list) else []
+    preferred_name = (
+        names[0]
+        if names
+        else str(hit.get("Name") or hit.get("Caption") or identifier).strip()
+    )
+    summary = {
+        "input_identifier": identifier,
+        "preferred_name": preferred_name,
+        "chem_id": hit.get("ChemId"),
+        "cas": hit.get("Cas"),
+        "names": names,
+    }
+    optional_fields = {
+        "smiles": ["Smiles", "SMILES"],
+        "canonical_smiles": ["CanonicalSmiles", "CanonicalSMILES", "Canonical"],
+        "dtxsid": ["Dtxsid", "DTXSID"],
+        "ec_number": ["EcNumber", "ECNumber"],
+        "formula": ["Formula", "MolecularFormula"],
+        "molecular_weight": ["MolWeight", "MolecularWeight", "MW"],
+        "log_kow": ["LogKow", "logKow", "LogP", "XlogP"],
+        "melting_point": ["MeltingPoint", "Mp"],
+        "boiling_point": ["BoilingPoint", "Bp"],
+        "density": ["Density"],
+        "water_solubility": ["WaterSolubility", "SolubilityInWater"],
+        "vapor_pressure": ["VaporPressure"],
+    }
+    for output_key, input_keys in optional_fields.items():
+        value = _first_present(hit, input_keys)
+        if value not in (None, ""):
+            summary[output_key] = value
+    return summary
+
+
+def _normalise_scalar(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _summarise_payload(payload: Any) -> str:
+    if payload is None:
+        return "No payload returned."
+    if isinstance(payload, list):
+        return f"Returned {len(payload)} item(s)."
+    if isinstance(payload, dict):
+        keys = list(payload.keys())[:5]
+        key_summary = ", ".join(str(key) for key in keys) or "no keys"
+        return f"Returned object with keys: {key_summary}."
+    text = str(payload).strip()
+    if len(text) > 160:
+        text = text[:157] + "..."
+    return f"Returned {type(payload).__name__}: {text}"
+
+
+def _build_evidence_row(
+    subject_role: str,
+    subject_name: str,
+    evidence_type: str,
+    tool_name: str,
+    status: str,
+    summary: str,
+    *,
+    endpoint: Optional[str] = None,
+    reference: Optional[str] = None,
+) -> Dict[str, Any]:
+    row = {
+        "subject_role": subject_role,
+        "subject_name": subject_name,
+        "evidence_type": evidence_type,
+        "tool": tool_name,
+        "status": status,
+        "summary": summary,
+    }
+    if endpoint:
+        row["endpoint"] = endpoint
+    if reference:
+        row["reference"] = reference
+    return row
+
+
+def _extract_numeric(value: Any) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = _normalise_scalar(value)
+    if not text:
+        return None
+    match = re.search(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", text.replace(",", "."))
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+async def _collect_structure_signature(
+    substance: Dict[str, Any],
+    subject_role: str,
+    toolbox_calls: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    name = substance.get("preferred_name", substance.get("input_identifier", "Unknown"))
+    chem_id = substance.get("chem_id")
+    input_smiles = _normalise_scalar(
+        substance.get("canonical_smiles") or substance.get("smiles")
+    )
+    signature = {
+        "subject_role": subject_role,
+        "subject_name": name,
+        "chem_id": chem_id,
+        "input_smiles": input_smiles,
+        "canonical_smiles": None,
+        "connectivity": None,
+        "status": "not_assessed",
+        "notes": "No SMILES descriptor was available in the resolved Toolbox record.",
+    }
+    if not input_smiles:
+        return signature
+
+    notes: List[str] = []
+    try:
+        canonical_payload, canonical_meta = await _invoke_with_meta(
+            qsar_client.canonicalize_structure, input_smiles
+        )
+        signature["canonical_smiles"] = _normalise_scalar(canonical_payload)
+        entry = _format_meta(
+            "structure/canonize",
+            canonical_meta,
+            chem_id=chem_id,
+            subject_role=subject_role,
+        )
+        if entry:
+            toolbox_calls.append(entry)
+    except QsarClientError as exc:
+        notes.append(f"Canonicalization failed: {exc}")
+
+    try:
+        connectivity_payload, connectivity_meta = await _invoke_with_meta(
+            qsar_client.get_connectivity, input_smiles
+        )
+        signature["connectivity"] = _normalise_scalar(connectivity_payload)
+        entry = _format_meta(
+            "structure/connectivity",
+            connectivity_meta,
+            chem_id=chem_id,
+            subject_role=subject_role,
+        )
+        if entry:
+            toolbox_calls.append(entry)
+    except QsarClientError as exc:
+        notes.append(f"Connectivity calculation failed: {exc}")
+
+    if signature["canonical_smiles"] or signature["connectivity"]:
+        signature["status"] = "assessed"
+        signature["notes"] = "Derived structure signature from Toolbox structure helpers."
+        if notes:
+            signature["notes"] += " " + " ".join(notes)
+    else:
+        signature["status"] = "partial" if notes else "not_assessed"
+        signature["notes"] = " ".join(notes) if notes else signature["notes"]
+    return signature
+
+
+def _build_structure_comparison(
+    target_signature: Dict[str, Any],
+    source_signatures: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    comparisons: List[Dict[str, Any]] = []
+    assessed_pairs = 0
+    canonical_exact_matches = 0
+    connectivity_exact_matches = 0
+    missing_pairs = 0
+
+    for source in source_signatures:
+        canonical_match = None
+        connectivity_match = None
+        comparable = False
+        notes: List[str] = []
+
+        if target_signature.get("canonical_smiles") and source.get("canonical_smiles"):
+            canonical_match = (
+                target_signature["canonical_smiles"] == source["canonical_smiles"]
+            )
+            comparable = True
+            if canonical_match:
+                canonical_exact_matches += 1
+                notes.append("Canonical SMILES match exactly.")
+            else:
+                notes.append("Canonical SMILES differ.")
+
+        if target_signature.get("connectivity") and source.get("connectivity"):
+            connectivity_match = (
+                target_signature["connectivity"] == source["connectivity"]
+            )
+            comparable = True
+            if connectivity_match:
+                connectivity_exact_matches += 1
+                notes.append("Connectivity strings match exactly.")
+            else:
+                notes.append("Connectivity strings differ.")
+
+        if comparable:
+            assessed_pairs += 1
+            status = "assessed"
+        else:
+            missing_pairs += 1
+            status = "not_assessed"
+            notes.append("Comparable structure signatures were not available for both substances.")
+
+        comparisons.append(
+            {
+                "source_name": source.get("subject_name"),
+                "source_chem_id": source.get("chem_id"),
+                "status": status,
+                "canonical_match": canonical_match,
+                "connectivity_match": connectivity_match,
+                "target_canonical_smiles": target_signature.get("canonical_smiles"),
+                "source_canonical_smiles": source.get("canonical_smiles"),
+                "target_connectivity": target_signature.get("connectivity"),
+                "source_connectivity": source.get("connectivity"),
+                "notes": " ".join(notes),
+            }
+        )
+
+    return {
+        "target": target_signature,
+        "sources": source_signatures,
+        "comparisons": comparisons,
+        "summary": {
+            "assessed_pairs": assessed_pairs,
+            "canonical_exact_matches": canonical_exact_matches,
+            "connectivity_exact_matches": connectivity_exact_matches,
+            "pairs_missing_structure_signatures": missing_pairs,
+        },
+    }
+
+
+def _compare_descriptor_values(target_value: Any, source_value: Any) -> Dict[str, Any]:
+    target_text = _normalise_scalar(target_value)
+    source_text = _normalise_scalar(source_value)
+    result = {"target": target_text, "source": source_text}
+    if target_text is None or source_text is None:
+        result["comparison"] = "insufficient_data"
+        return result
+
+    target_num = _extract_numeric(target_value)
+    source_num = _extract_numeric(source_value)
+    if target_num is not None and source_num is not None:
+        absolute_delta = round(source_num - target_num, 6)
+        relative_delta = (
+            round(abs(absolute_delta) / abs(target_num), 6) if target_num else None
+        )
+        approx_match = abs(absolute_delta) <= 0.01 or (
+            relative_delta is not None and relative_delta <= 0.05
+        )
+        result["comparison"] = "approx_match" if approx_match else "different"
+        result["absolute_delta"] = absolute_delta
+        if relative_delta is not None:
+            result["relative_delta"] = relative_delta
+        return result
+
+    result["comparison"] = "exact_match" if target_text == source_text else "different"
+    return result
+
+
+def _build_physicochemical_comparison(
+    target_substance: Dict[str, Any],
+    source_analogues: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    descriptor_keys = [
+        "formula",
+        "molecular_weight",
+        "log_kow",
+        "melting_point",
+        "boiling_point",
+        "density",
+        "water_solubility",
+        "vapor_pressure",
+    ]
+    target_descriptors = {
+        key: target_substance.get(key)
+        for key in descriptor_keys
+        if target_substance.get(key) not in (None, "")
+    }
+    comparisons: List[Dict[str, Any]] = []
+    assessed_pairs = 0
+    shared_descriptor_count = 0
+
+    for analogue in source_analogues:
+        shared: Dict[str, Any] = {}
+        for key in descriptor_keys:
+            target_value = target_substance.get(key)
+            source_value = analogue.get(key)
+            if target_value in (None, "") or source_value in (None, ""):
+                continue
+            shared[key] = _compare_descriptor_values(target_value, source_value)
+
+        if shared:
+            assessed_pairs += 1
+            shared_descriptor_count += len(shared)
+            status = "assessed"
+            notes = f"Compared {len(shared)} shared descriptor(s)."
+        else:
+            status = "not_assessed"
+            notes = "No overlapping physicochemical descriptors were available in the resolved records."
+
+        comparisons.append(
+            {
+                "source_name": analogue.get("preferred_name"),
+                "source_chem_id": analogue.get("chem_id"),
+                "status": status,
+                "shared_descriptors": shared,
+                "notes": notes,
+            }
+        )
+
+    return {
+        "target_descriptors": target_descriptors,
+        "comparisons": comparisons,
+        "summary": {
+            "assessed_pairs": assessed_pairs,
+            "shared_descriptor_count": shared_descriptor_count,
+            "descriptor_keys_considered": descriptor_keys,
+        },
+    }
+
+
+def _structure_evidence_rows(structure_comparison: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    target = structure_comparison.get("target", {})
+    if target.get("input_smiles"):
+        rows.append(
+            _build_evidence_row(
+                "target",
+                target.get("subject_name", "Unknown"),
+                "structure_signature",
+                "canonicalize_structure/structure_connectivity",
+                target.get("status", "not_assessed"),
+                target.get("notes", ""),
+                reference=str(target.get("chem_id")) if target.get("chem_id") else None,
+            )
+        )
+    for comparison in structure_comparison.get("comparisons", []):
+        rows.append(
+            _build_evidence_row(
+                "source_analogue",
+                comparison.get("source_name", "Unknown"),
+                "structure_comparison",
+                "canonicalize_structure/structure_connectivity",
+                comparison.get("status", "not_assessed"),
+                comparison.get("notes", ""),
+                reference=str(comparison.get("source_chem_id"))
+                if comparison.get("source_chem_id")
+                else None,
+            )
+        )
+    return rows
+
+
+def _physchem_evidence_rows(
+    physicochemical_comparison: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for comparison in physicochemical_comparison.get("comparisons", []):
+        rows.append(
+            _build_evidence_row(
+                "source_analogue",
+                comparison.get("source_name", "Unknown"),
+                "physicochemical_comparison",
+                "search_chemicals",
+                comparison.get("status", "not_assessed"),
+                comparison.get("notes", ""),
+                reference=str(comparison.get("source_chem_id"))
+                if comparison.get("source_chem_id")
+                else None,
+            )
+        )
+    return rows
+
+
+async def _resolve_chemical(
+    identifier: str,
+    search_type: str,
+    label: str,
+    toolbox_calls: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    candidate = (identifier or "").strip()
+    resolved = {
+        "identifier": candidate,
+        "search_type": search_type,
+        "status": "not_found",
+        "hits": [],
+        "selected": None,
+        "summary": None,
+        "error": None,
+    }
+    if not candidate:
+        resolved["status"] = "skipped"
+        resolved["error"] = "Identifier was blank."
+        return resolved
+
+    try:
+        payload, meta = await _invoke_with_meta(
+            qsar_client.search_chemicals, candidate, search_type
+        )
+    except QsarClientError as exc:
+        resolved["status"] = "error"
+        resolved["error"] = str(exc)
+        return resolved
+
+    entry = _format_meta(f"{label}/search", meta, identifier=candidate)
+    if entry:
+        toolbox_calls.append(entry)
+
+    hits = _coerce_hits(payload)
+    resolved["hits"] = hits
+    if not hits:
+        resolved["error"] = f"No Toolbox records matched '{candidate}'."
+        return resolved
+
+    primary = next((hit for hit in hits if hit.get("ChemId")), hits[0])
+    resolved["status"] = "resolved"
+    resolved["selected"] = primary
+    resolved["summary"] = _chemical_summary(primary, candidate)
+    return resolved
 
 
 def _format_meta(
@@ -132,6 +671,613 @@ async def _invoke_with_meta(func, *args, **kwargs):
     if isinstance(result, tuple) and len(result) == 2:
         return result
     return result, None
+
+
+def _iso_utc_now() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _handoff_record_id(prefix: str) -> str:
+    return f"{prefix}-{uuid4().hex[:12]}"
+
+
+def _portable_identity_from_summary(
+    summary: Dict[str, Any] | None, fallback_identifier: str
+) -> Dict[str, Any] | None:
+    if not isinstance(summary, dict):
+        return None
+    chem_id = _normalise_scalar(summary.get("chem_id"))
+    preferred_name = _normalise_scalar(summary.get("preferred_name"))
+    if not chem_id or not preferred_name:
+        return None
+
+    identity = {
+        "inputIdentifier": _normalise_scalar(summary.get("input_identifier"))
+        or fallback_identifier,
+        "preferredName": preferred_name,
+        "chemId": chem_id,
+    }
+    cas = _normalise_scalar(summary.get("cas"))
+    smiles = _normalise_scalar(summary.get("smiles"))
+    if cas:
+        identity["cas"] = cas
+    if smiles:
+        identity["smiles"] = smiles
+    return identity
+
+
+def _matching_errors(errors: List[str], reference: str) -> List[str]:
+    return [message for message in errors if reference in message]
+
+
+def _build_profiler_findings(
+    requested_ids: List[str], results: List[Dict[str, Any]], errors: List[str]
+) -> List[Dict[str, Any]]:
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for item in results or []:
+        reference = _normalise_scalar(item.get("profiler_guid"))
+        if reference:
+            grouped.setdefault(reference, []).append(item)
+
+    findings: List[Dict[str, Any]] = []
+    for requested_id in _unique(requested_ids):
+        matches = grouped.get(requested_id, [])
+        if matches:
+            subject_roles = _unique(
+                [str(item.get("subject_role")) for item in matches if item.get("subject_role")]
+            )
+            subject_clause = f" across {', '.join(subject_roles)}" if subject_roles else ""
+            findings.append(
+                {
+                    "profilerGuid": requested_id,
+                    "status": "ok",
+                    "summary": (
+                        f"Collected {len(matches)} profiler result(s){subject_clause}. "
+                        f"{_summarise_payload(matches[0].get('result'))}"
+                    ),
+                }
+            )
+            continue
+
+        error_messages = _matching_errors(errors, requested_id)
+        findings.append(
+            {
+                "profilerGuid": requested_id,
+                "status": "error" if error_messages else "not_run",
+                "summary": " ".join(error_messages)
+                if error_messages
+                else "Requested profiler evidence was not returned.",
+            }
+        )
+    return findings
+
+
+def _build_metabolism_findings(
+    requested_ids: List[str], results: List[Dict[str, Any]], errors: List[str]
+) -> List[Dict[str, Any]]:
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for item in results or []:
+        reference = _normalise_scalar(item.get("simulator_guid"))
+        if reference:
+            grouped.setdefault(reference, []).append(item)
+
+    findings: List[Dict[str, Any]] = []
+    for requested_id in _unique(requested_ids):
+        matches = grouped.get(requested_id, [])
+        if matches:
+            findings.append(
+                {
+                    "simulatorGuid": requested_id,
+                    "status": "ok",
+                    "summary": (
+                        f"Collected {len(matches)} simulator result(s). "
+                        f"{_summarise_payload(matches[0].get('result'))}"
+                    ),
+                }
+            )
+            continue
+
+        error_messages = _matching_errors(errors, requested_id)
+        findings.append(
+            {
+                "simulatorGuid": requested_id,
+                "status": "error" if error_messages else "not_run",
+                "summary": " ".join(error_messages)
+                if error_messages
+                else "Requested metabolism evidence was not returned.",
+            }
+        )
+    return findings
+
+
+def _build_qsar_findings(
+    requested_ids: List[str], results: List[Dict[str, Any]], errors: List[str]
+) -> List[Dict[str, Any]]:
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for item in results or []:
+        reference = _normalise_scalar(item.get("qsar_guid"))
+        if reference:
+            grouped.setdefault(reference, []).append(item)
+
+    findings: List[Dict[str, Any]] = []
+    for requested_id in _unique(requested_ids):
+        matches = grouped.get(requested_id, [])
+        if matches:
+            findings.append(
+                {
+                    "qsarGuid": requested_id,
+                    "status": "ok",
+                    "predictionSummary": _summarise_payload(matches[0].get("prediction")),
+                    "domainSummary": _summarise_payload(matches[0].get("domain")),
+                }
+            )
+            continue
+
+        error_messages = _matching_errors(errors, requested_id)
+        error_summary = (
+            " ".join(error_messages)
+            if error_messages
+            else "Requested QSAR evidence was not returned."
+        )
+        findings.append(
+            {
+                "qsarGuid": requested_id,
+                "status": "error" if error_messages else "not_run",
+                "predictionSummary": error_summary,
+                "domainSummary": error_summary,
+            }
+        )
+    return findings
+
+
+def _build_portable_workflow_record(
+    *,
+    record_id: str,
+    identifier: str,
+    search_type: str,
+    context: Optional[str],
+    primary_entrypoint: str,
+    helper_tools: List[str],
+    status: str,
+    log_bundle: Dict[str, Any],
+    toolbox_meta: Dict[str, Any],
+    assistant_enabled: bool,
+    generated_at: str,
+    selected_summary: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    input_identifier = {"value": identifier}
+    if isinstance(selected_summary, dict):
+        resolved_name = _normalise_scalar(selected_summary.get("preferred_name"))
+        chem_id = _normalise_scalar(selected_summary.get("chem_id"))
+        if resolved_name:
+            input_identifier["resolvedName"] = resolved_name
+        if chem_id:
+            input_identifier["chemId"] = chem_id
+
+    inputs = log_bundle.get("inputs", {})
+    return {
+        "schemaName": "oqtWorkflowRecord",
+        "schemaVersion": "v1",
+        "module": "oqt-mcp",
+        "workflowId": record_id,
+        "inputIdentifier": input_identifier,
+        "searchType": search_type,
+        "context": context,
+        "toolchain": {
+            "primaryEntrypoint": primary_entrypoint,
+            "helperTools": _unique(helper_tools),
+            "toolboxCompatibility": TOOLBOX_COMPATIBILITY_NOTE,
+        },
+        "artifacts": {
+            "json": {
+                "fieldName": "log_json",
+                "delivery": "inline",
+                "mediaType": "application/json",
+                "description": "Comprehensive workflow log bundle.",
+            },
+            "markdown": {
+                "fieldName": "summary_markdown",
+                "delivery": "inline",
+                "mediaType": "text/markdown",
+                "description": "Human-readable workflow narrative.",
+            },
+            "pdf": {
+                "fieldName": "pdf_report_base64",
+                "delivery": "inline",
+                "mediaType": "application/pdf",
+                "description": "Base64-encoded PDF report.",
+                "encoding": "base64",
+            },
+        },
+        "executionMetadata": {
+            "status": status,
+            "assistantEnabled": assistant_enabled,
+            "requestedProfilers": _unique(inputs.get("profiler_guids", []) or []),
+            "requestedSimulators": _unique(inputs.get("simulator_guids", []) or []),
+            "requestedQsarModels": _unique(inputs.get("qsar_guids", []) or []),
+            "toolboxCallCount": len(toolbox_meta.get("calls", []) or []),
+            "errors": [str(message) for message in log_bundle.get("errors", []) or []],
+        },
+        "provenance": {
+            "sourceSystem": TOOLBOX_SOURCE_SYSTEM,
+            "generatedBy": GENERATED_BY_VERSION,
+            "generatedAt": generated_at,
+            "repository": TOXMCP_REPOSITORY_URL,
+            "toolboxCompatibility": TOOLBOX_COMPATIBILITY_NOTE,
+            "references": [TOXMCP_HOMEPAGE_URL],
+        },
+    }
+
+
+def _build_workflow_portable_handoffs(
+    status: str,
+    log_bundle: Dict[str, Any],
+    toolbox_meta: Dict[str, Any],
+    *,
+    assistant_enabled: bool = False,
+) -> Dict[str, Any]:
+    inputs = log_bundle.get("inputs", {})
+    identifier = str(inputs.get("identifier") or log_bundle.get("identifier") or "").strip()
+    search_type = str(inputs.get("search_type") or "auto")
+    selected_summary = None
+    if isinstance(log_bundle.get("selected_chemical"), dict):
+        selected_summary = _chemical_summary(log_bundle["selected_chemical"], identifier)
+
+    generated_at = _iso_utc_now()
+    workflow_id = _handoff_record_id("oqtwf")
+    handoffs = {
+        "oqtWorkflowRecord.v1": _build_portable_workflow_record(
+            record_id=workflow_id,
+            identifier=identifier,
+            search_type=search_type,
+            context=inputs.get("context"),
+            primary_entrypoint="run_oqt_multiagent_workflow",
+            helper_tools=_unique(
+                ["search_chemicals"]
+                + (
+                    ["run_profiler"]
+                    if _unique(inputs.get("profiler_guids", []) or [])
+                    else []
+                )
+                + (
+                    ["run_metabolism_simulator"]
+                    if _unique(inputs.get("simulator_guids", []) or [])
+                    else []
+                )
+                + (
+                    ["run_qsar_model"]
+                    if _unique(inputs.get("qsar_guids", []) or [])
+                    else []
+                )
+            ),
+            status=status,
+            log_bundle=log_bundle,
+            toolbox_meta=toolbox_meta,
+            assistant_enabled=assistant_enabled,
+            generated_at=generated_at,
+            selected_summary=selected_summary,
+        )
+    }
+
+    identity = _portable_identity_from_summary(selected_summary, identifier)
+    if not identity:
+        return handoffs
+
+    errors = [str(message) for message in log_bundle.get("errors", []) or []]
+    profiler_findings = _build_profiler_findings(
+        inputs.get("profiler_guids", []) or [],
+        log_bundle.get("profiler_results", []) or [],
+        errors,
+    )
+    metabolism_findings = _build_metabolism_findings(
+        inputs.get("simulator_guids", []) or [],
+        log_bundle.get("simulator_results", []) or [],
+        errors,
+    )
+    qsar_findings = _build_qsar_findings(
+        inputs.get("qsar_guids", []) or [],
+        log_bundle.get("qsar_results", []) or [],
+        errors,
+    )
+
+    limitations: List[str] = []
+    if status != "ok":
+        limitations.append(f"Workflow completed with status '{status}'.")
+    if inputs.get("profiler_guids") and not any(
+        item.get("status") == "ok" for item in profiler_findings
+    ):
+        limitations.append("No requested profiler evidence was returned successfully.")
+    if inputs.get("simulator_guids") and not any(
+        item.get("status") == "ok" for item in metabolism_findings
+    ):
+        limitations.append("No requested metabolism evidence was returned successfully.")
+    if inputs.get("qsar_guids") and not any(
+        item.get("status") == "ok" for item in qsar_findings
+    ):
+        limitations.append("No requested QSAR evidence was returned successfully.")
+    limitations.extend(errors)
+
+    handoffs["oqtHazardEvidenceSummary.v1"] = {
+        "schemaName": "oqtHazardEvidenceSummary",
+        "schemaVersion": "v1",
+        "module": "oqt-mcp",
+        "chemicalIdentity": identity,
+        "profilers": profiler_findings,
+        "metabolismFindings": metabolism_findings,
+        "qsarFindings": qsar_findings,
+        "applicabilityNotes": [
+            TOOLBOX_COMPATIBILITY_NOTE,
+            "Use this module-scoped evidence as input to a downstream orchestrator for cross-module synthesis.",
+        ],
+        "provenance": {
+            "workflowId": workflow_id,
+            "sourceSystem": TOOLBOX_SOURCE_SYSTEM,
+            "generatedBy": GENERATED_BY_VERSION,
+            "generatedAt": generated_at,
+            "references": [TOXMCP_REPOSITORY_URL],
+        },
+        "limitations": _unique(limitations),
+        "context": inputs.get("context"),
+    }
+    return handoffs
+
+
+def _build_grouping_portable_handoffs(
+    status: str,
+    identifier: str,
+    log_bundle: Dict[str, Any],
+    grouping_justification: Dict[str, Any],
+    toolbox_meta: Dict[str, Any],
+) -> Dict[str, Any]:
+    inputs = log_bundle.get("inputs", {})
+    report_context = grouping_justification.get("report_context", {}) or {}
+    target_substance = grouping_justification.get("target_substance") or {}
+    identity = _portable_identity_from_summary(target_substance, identifier)
+
+    generated_at = _iso_utc_now()
+    workflow_id = _handoff_record_id("oqtgrp")
+    handoffs = {
+        "oqtWorkflowRecord.v1": _build_portable_workflow_record(
+            record_id=workflow_id,
+            identifier=identifier,
+            search_type=str(inputs.get("search_type") or "auto"),
+            context=inputs.get("context"),
+            primary_entrypoint="build_grouping_justification",
+            helper_tools=_unique(
+                ["search_chemicals", "canonicalize_structure", "structure_connectivity"]
+                + (
+                    ["run_profiler", "group_chemicals_by_profiler"]
+                    if _unique(inputs.get("profiler_guids", []) or [])
+                    else []
+                )
+                + (
+                    ["run_metabolism_simulator"]
+                    if _unique(inputs.get("simulator_guids", []) or [])
+                    else []
+                )
+                + (
+                    ["run_qsar_model"]
+                    if _unique(inputs.get("qsar_guids", []) or [])
+                    else []
+                )
+            ),
+            status=status,
+            log_bundle=log_bundle,
+            toolbox_meta=toolbox_meta,
+            assistant_enabled=False,
+            generated_at=generated_at,
+            selected_summary=target_substance,
+        )
+    }
+
+    if not identity:
+        return handoffs
+
+    errors = [str(message) for message in log_bundle.get("errors", []) or []]
+    profiler_findings = _build_profiler_findings(
+        inputs.get("profiler_guids", []) or [],
+        log_bundle.get("profiler_results", []) or [],
+        errors,
+    )
+    uncertainty = grouping_justification.get("uncertainty_assessment", {}) or {}
+    endpoint_conclusions = []
+    for item in grouping_justification.get("endpoint_justifications", []) or []:
+        endpoint_conclusions.append(
+            {
+                "endpoint": str(item.get("endpoint") or "Unspecified endpoint"),
+                "conclusion": str(item.get("conclusion") or "No conclusion recorded."),
+                "confidence": str(item.get("confidence") or "low"),
+                "residualUncertainty": str(
+                    item.get("residual_uncertainty")
+                    or uncertainty.get("overall_level")
+                    or "high"
+                ),
+            }
+        )
+
+    analogue_entries = []
+    rationale = _normalise_scalar(report_context.get("grouping_hypothesis")) or (
+        "Resolved source analogue supporting the grouping hypothesis."
+    )
+    for analogue in grouping_justification.get("source_analogues", []) or []:
+        chem_id = _normalise_scalar(analogue.get("chem_id"))
+        preferred_name = _normalise_scalar(analogue.get("preferred_name"))
+        identifier_value = _normalise_scalar(analogue.get("input_identifier"))
+        if not chem_id or not preferred_name or not identifier_value:
+            continue
+        analogue_entries.append(
+            {
+                "identifier": identifier_value,
+                "preferredName": preferred_name,
+                "chemId": chem_id,
+                "rationale": rationale,
+            }
+        )
+
+    limitations: List[str] = []
+    if status != "ok":
+        limitations.append(f"Grouping dossier completed with status '{status}'.")
+    for excluded in grouping_justification.get("excluded_analogues", []) or []:
+        analogue_identifier = _normalise_scalar(excluded.get("identifier")) or "Unknown analogue"
+        reason = _normalise_scalar(excluded.get("reason")) or "Unspecified exclusion."
+        limitations.append(f"{analogue_identifier}: {reason}")
+    limitations.extend(grouping_justification.get("recommended_follow_ups", []) or [])
+    limitations.extend(errors)
+
+    handoffs["oqtReadAcrossSummary.v1"] = {
+        "schemaName": "oqtReadAcrossSummary",
+        "schemaVersion": "v1",
+        "module": "oqt-mcp",
+        "chemicalIdentity": identity,
+        "groupingMethod": {
+            "type": "analogue_read_across",
+            "problemFormulation": str(
+                report_context.get("problem_formulation") or "Not specified."
+            ),
+            "decisionContext": str(
+                report_context.get("decision_context") or "Not specified."
+            ),
+            "acceptedUncertaintyLevel": str(
+                report_context.get("accepted_uncertainty_level") or "medium"
+            ),
+            **(
+                {"routeOfExposure": str(report_context.get("route_of_exposure"))}
+                if report_context.get("route_of_exposure")
+                else {}
+            ),
+        },
+        "analogues": analogue_entries,
+        "supportingProfiler": profiler_findings,
+        "justification": {
+            "hypothesis": rationale,
+            "summary": (
+                f"Grouping dossier assembled with {len(analogue_entries)} resolved analogue(s); "
+                f"overall residual uncertainty is {uncertainty.get('overall_level', 'high')}."
+            ),
+            "residualUncertainty": str(uncertainty.get("overall_level") or "high"),
+            "acceptableForContext": bool(
+                uncertainty.get("acceptable_for_context", False)
+            ),
+            "endpointConclusions": endpoint_conclusions,
+        },
+        "provenance": {
+            "recordId": workflow_id,
+            "sourceSystem": TOOLBOX_SOURCE_SYSTEM,
+            "generatedBy": GENERATED_BY_VERSION,
+            "generatedAt": generated_at,
+            "references": [TOXMCP_REPOSITORY_URL],
+        },
+        "limitations": _unique(limitations),
+    }
+    return handoffs
+
+
+def _normalise_status(value: Optional[str]) -> Optional[str]:
+    candidate = _normalise_scalar(value)
+    if not candidate:
+        return None
+    candidate = candidate.lower()
+    return candidate if candidate in {"ok", "partial", "not_found", "error"} else None
+
+
+def _infer_workflow_status(log_bundle: Dict[str, Any]) -> str:
+    selected = isinstance(log_bundle.get("selected_chemical"), dict)
+    errors = [str(message) for message in log_bundle.get("errors", []) or []]
+    if selected:
+        return "partial" if errors else "ok"
+    if not log_bundle.get("search_results"):
+        if any("No Toolbox records found" in message for message in errors):
+            return "not_found"
+    return "error" if errors else "ok"
+
+
+def _infer_grouping_status(log_bundle: Dict[str, Any]) -> str:
+    target_resolution = log_bundle.get("target_resolution", {}) or {}
+    target_status = _normalise_scalar(target_resolution.get("status"))
+    errors = [str(message) for message in log_bundle.get("errors", []) or []]
+    if target_status and target_status != "resolved":
+        return "not_found" if target_status == "not_found" else "error"
+    return "partial" if errors else "ok"
+
+
+def build_portable_handoffs_from_log_bundle(
+    log: Dict[str, Any],
+    workflow_type: str = "auto",
+    status: Optional[str] = None,
+) -> Dict[str, Any]:
+    requested_type = _normalise_scalar(workflow_type) or "auto"
+    if requested_type not in {"auto", "workflow", "grouping"}:
+        raise ValueError("workflow_type must be one of: auto, workflow, grouping.")
+
+    source_log = log or {}
+    log_bundle = source_log
+    if (
+        isinstance(source_log.get("mcp_workflow"), dict)
+        and requested_type in {"auto", "workflow"}
+    ):
+        log_bundle = source_log["mcp_workflow"]
+
+    if requested_type == "auto":
+        effective_type = (
+            "grouping"
+            if isinstance(log_bundle.get("grouping_justification"), dict)
+            or "target_resolution" in log_bundle
+            else "workflow"
+        )
+    else:
+        effective_type = requested_type
+
+    normalised_status = _normalise_status(status)
+
+    if effective_type == "grouping":
+        grouping_justification = log_bundle.get("grouping_justification")
+        if not isinstance(grouping_justification, dict):
+            raise ValueError(
+                "Grouping logs must contain a 'grouping_justification' object."
+            )
+        identifier = (
+            _normalise_scalar(log_bundle.get("identifier"))
+            or _normalise_scalar(
+                grouping_justification.get("report_context", {}).get("identifier")
+            )
+            or _normalise_scalar(log_bundle.get("inputs", {}).get("identifier"))
+            or "unknown"
+        )
+        inferred_status = normalised_status or _infer_grouping_status(log_bundle)
+        return {
+            "workflow_type": effective_type,
+            "status": inferred_status,
+            "portable_handoffs": _build_grouping_portable_handoffs(
+                inferred_status,
+                identifier,
+                log_bundle,
+                grouping_justification,
+                log_bundle.get("toolbox", {}) or {},
+            ),
+        }
+
+    identifier = (
+        _normalise_scalar(log_bundle.get("identifier"))
+        or _normalise_scalar(log_bundle.get("inputs", {}).get("identifier"))
+        or "unknown"
+    )
+    inferred_status = normalised_status or _infer_workflow_status(log_bundle)
+    assistant_enabled = isinstance(source_log.get("assistant_session"), dict)
+    return {
+        "workflow_type": effective_type,
+        "status": inferred_status,
+        "portable_handoffs": _build_workflow_portable_handoffs(
+            inferred_status,
+            log_bundle,
+            log_bundle.get("toolbox", {}) or {},
+            assistant_enabled=assistant_enabled,
+        ),
+    }
 
 
 async def run_oqt_multiagent_workflow(
@@ -412,6 +1558,9 @@ async def run_oqt_multiagent_workflow(
             response["log_json"] = combined_log
             if toolbox_meta.get("calls"):
                 response["toolbox"] = toolbox_meta
+            response["portable_handoffs"] = _build_workflow_portable_handoffs(
+                "ok", log_bundle, toolbox_meta, assistant_enabled=True
+            )
             response["assistant"] = {"enabled": True, **assistant_meta}
             return response
 
@@ -450,10 +1599,1010 @@ def _build_workflow_response(
         "summary_markdown": summary_markdown,
         "log_json": log_bundle,
         "pdf_report_base64": pdf_report_base64,
+        "portable_handoffs": _build_workflow_portable_handoffs(
+            status, log_bundle, toolbox_meta
+        ),
     }
     if toolbox_meta.get("calls"):
         response["toolbox"] = toolbox_meta
     return response
+
+
+def _build_similarity_assessment(
+    source_analogues: List[Dict[str, Any]],
+    structure_comparison: Dict[str, Any],
+    physicochemical_comparison: Dict[str, Any],
+    profiler_results: List[Dict[str, Any]],
+    profiler_groupings: List[Dict[str, Any]],
+    simulator_results: List[Dict[str, Any]],
+    qsar_results: List[Dict[str, Any]],
+    grouping_hypothesis: str,
+) -> Dict[str, Dict[str, Any]]:
+    analogue_count = len(source_analogues)
+    structure_summary = structure_comparison.get("summary", {})
+    physchem_summary = physicochemical_comparison.get("summary", {})
+    target_profiles = sum(
+        1 for item in profiler_results if item.get("subject_role") == "target"
+    )
+    source_profiles = sum(
+        1 for item in profiler_results if item.get("subject_role") == "source_analogue"
+    )
+    target_simulators = sum(
+        1 for item in simulator_results if item.get("subject_role") == "target"
+    )
+    source_simulators = sum(
+        1 for item in simulator_results if item.get("subject_role") == "source_analogue"
+    )
+
+    return {
+        "structural_similarity": {
+            "status": "assessed"
+            if structure_summary.get("assessed_pairs")
+            else "limited"
+            if analogue_count and structure_comparison.get("target", {}).get("input_smiles")
+            else "not_assessed",
+            "data_quality": "medium"
+            if structure_summary.get("assessed_pairs")
+            else "low",
+            "strength_of_evidence": "medium"
+            if structure_summary.get("assessed_pairs")
+            else "low",
+            "comments": (
+                f"Assessed {structure_summary.get('assessed_pairs', 0)} target/source pair(s); "
+                f"{structure_summary.get('canonical_exact_matches', 0)} canonical SMILES exact match(es) and "
+                f"{structure_summary.get('connectivity_exact_matches', 0)} connectivity exact match(es)."
+                if structure_summary.get("assessed_pairs")
+                else "Source analogues were resolved, but comparable structure signatures were not available for the assessed pairs."
+                if analogue_count
+                else "No source analogues were provided, so structural similarity could not be documented."
+            ),
+        },
+        "physicochemical_similarity": {
+            "status": "assessed"
+            if physchem_summary.get("assessed_pairs")
+            else "limited"
+            if analogue_count and physicochemical_comparison.get("target_descriptors")
+            else "not_assessed",
+            "data_quality": "medium"
+            if physchem_summary.get("shared_descriptor_count")
+            else "low",
+            "strength_of_evidence": "medium"
+            if physchem_summary.get("shared_descriptor_count")
+            else "low",
+            "comments": (
+                f"Compared {physchem_summary.get('shared_descriptor_count', 0)} shared physicochemical descriptor(s) across "
+                f"{physchem_summary.get('assessed_pairs', 0)} target/source pair(s)."
+                if physchem_summary.get("shared_descriptor_count")
+                else "Target and source substances were resolved, but no overlapping physicochemical descriptors were exposed in the available records."
+                if analogue_count
+                else "No source analogues were provided, so physicochemical similarity could not be documented."
+            ),
+        },
+        "reactivity_profile_similarity": {
+            "status": "assessed"
+            if target_profiles and source_profiles
+            else "limited"
+            if target_profiles
+            else "not_assessed",
+            "data_quality": "medium" if target_profiles else "low",
+            "strength_of_evidence": "medium"
+            if target_profiles and source_profiles
+            else "low",
+            "comments": (
+                f"Profiler evidence was gathered under the hypothesis: {grouping_hypothesis}"
+                if target_profiles
+                else "No profiler evidence was collected for the selected substances."
+            ),
+        },
+        "adme_tk_similarity": {
+            "status": "assessed"
+            if target_simulators and source_simulators
+            else "limited"
+            if target_simulators
+            else "not_assessed",
+            "data_quality": "medium" if target_simulators else "low",
+            "strength_of_evidence": "medium"
+            if target_simulators and source_simulators
+            else "low",
+            "comments": (
+                "Metabolism simulator output is available for the target and at least one source analogue."
+                if target_simulators and source_simulators
+                else "Metabolism simulation is only available for the target substance."
+                if target_simulators
+                else "No metabolism simulator evidence was collected."
+            ),
+        },
+        "bioactivity_similarity": {
+            "status": "limited" if profiler_results or qsar_results else "not_assessed",
+            "data_quality": "medium" if profiler_results or qsar_results else "low",
+            "strength_of_evidence": "low",
+            "comments": (
+                "Bioactivity support is limited to profiler and QSAR outputs collected in this dossier."
+                if profiler_results or qsar_results
+                else "No bioactivity-oriented evidence was collected."
+            ),
+        },
+        "mechanistic_similarity": {
+            "status": "limited"
+            if profiler_groupings or simulator_results
+            else "not_assessed",
+            "data_quality": "medium" if profiler_groupings or simulator_results else "low",
+            "strength_of_evidence": "medium"
+            if profiler_groupings
+            else "low",
+            "comments": (
+                "Mechanistic support is based on profiler grouping and/or metabolism evidence."
+                if profiler_groupings or simulator_results
+                else "No mechanistic support was collected."
+            ),
+        },
+        "toxicological_profile_similarity": {
+            "status": "limited" if qsar_results else "not_assessed",
+            "data_quality": "medium" if qsar_results else "low",
+            "strength_of_evidence": "low",
+            "comments": (
+                "Target-side QSAR predictions were included as supporting evidence."
+                if qsar_results
+                else "No QSAR model support was included in this dossier."
+            ),
+        },
+    }
+
+
+def _uncertainty_from_context(context: Dict[str, Any]) -> str:
+    if context.get("status") == "not_assessed":
+        return "high"
+    if context.get("strength_of_evidence") == "high":
+        return "low"
+    if context.get("strength_of_evidence") == "medium":
+        return "medium"
+    return "high"
+
+
+def _build_uncertainty_assessment(
+    similarity_assessment: Dict[str, Dict[str, Any]],
+    accepted_uncertainty_level: str,
+    source_analogues: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    ranks = {"low": 1, "medium": 2, "high": 3}
+    rows: List[Dict[str, Any]] = []
+    missing_aspects: List[str] = []
+    scores: List[int] = []
+
+    for aspect, context in similarity_assessment.items():
+        uncertainty = _uncertainty_from_context(context)
+        rows.append(
+            {
+                "aspect": aspect,
+                "data_quality": context.get("data_quality", "low"),
+                "strength_of_evidence": context.get("strength_of_evidence", "low"),
+                "uncertainty": uncertainty,
+                "comments": context.get("comments", ""),
+            }
+        )
+        if context.get("status") == "not_assessed":
+            missing_aspects.append(aspect)
+        scores.append(ranks[uncertainty])
+
+    overall_level = "high"
+    if scores:
+        average = sum(scores) / len(scores)
+        if average <= 1.4:
+            overall_level = "low"
+        elif average <= 2.2:
+            overall_level = "medium"
+    if not source_analogues:
+        overall_level = "high"
+
+    accepted_level = accepted_uncertainty_level if accepted_uncertainty_level in ranks else "medium"
+    return {
+        "accepted_level": accepted_level,
+        "overall_level": overall_level,
+        "acceptable_for_context": ranks[overall_level] <= ranks[accepted_level],
+        "what_is_not_addressed": missing_aspects,
+        "assessment_table": rows,
+    }
+
+
+def _build_endpoint_justifications(
+    endpoints: List[str],
+    source_analogues: List[Dict[str, Any]],
+    similarity_assessment: Dict[str, Dict[str, Any]],
+    uncertainty_assessment: Dict[str, Any],
+    grouping_hypothesis: str,
+    decision_context: str,
+    route_of_exposure: Optional[str],
+    profiler_guids: List[str],
+    simulator_guids: List[str],
+    qsar_guids: List[str],
+) -> List[Dict[str, Any]]:
+    source_names = [item.get("preferred_name", "Unknown") for item in source_analogues]
+    supported_contexts = [
+        aspect
+        for aspect, value in similarity_assessment.items()
+        if value.get("status") != "not_assessed"
+    ]
+    overall_uncertainty = uncertainty_assessment.get("overall_level", "high")
+    confidence = {"low": "high", "medium": "medium", "high": "low"}[overall_uncertainty]
+
+    justifications: List[Dict[str, Any]] = []
+    for endpoint in endpoints:
+        if source_analogues:
+            strategy = "read_across_with_weight_of_evidence"
+            conclusion = (
+                f"Provisional analogue justification assembled for {endpoint}."
+                if uncertainty_assessment.get("acceptable_for_context")
+                else f"Analogue dossier assembled for {endpoint}, but residual uncertainty remains above the accepted level."
+            )
+        else:
+            strategy = "weight_of_evidence_preparation_only"
+            conclusion = (
+                f"No source analogue set was resolved for {endpoint}; additional analogue selection is required before read-across can be defended."
+            )
+
+        support_bits = [
+            f"{len(source_analogues)} source analogue(s)" if source_analogues else "no resolved source analogues",
+            f"{len(profiler_guids)} profiler(s)" if profiler_guids else "no profiler evidence",
+            f"{len(simulator_guids)} simulator(s)" if simulator_guids else "no metabolism evidence",
+            f"{len(qsar_guids)} QSAR model(s)" if qsar_guids else "no QSAR evidence",
+        ]
+        rationale = (
+            f"Decision context: {decision_context}. Grouping hypothesis: {grouping_hypothesis}. "
+            f"The dossier currently includes {', '.join(support_bits)}. "
+            f"Supported similarity contexts: {', '.join(supported_contexts) if supported_contexts else 'none documented'}."
+        )
+
+        payload = {
+            "endpoint": endpoint,
+            "strategy": strategy,
+            "conclusion": conclusion,
+            "confidence": confidence,
+            "residual_uncertainty": overall_uncertainty,
+            "supporting_similarity_contexts": supported_contexts,
+            "source_analogues": source_names,
+            "decision_context": decision_context,
+            "rationale": rationale,
+        }
+        if route_of_exposure:
+            payload["route_of_exposure"] = route_of_exposure
+        justifications.append(payload)
+
+    return justifications
+
+
+def _build_recommended_follow_ups(
+    source_analogues: List[Dict[str, Any]],
+    similarity_assessment: Dict[str, Dict[str, Any]],
+    uncertainty_assessment: Dict[str, Any],
+    profiler_guids: List[str],
+    simulator_guids: List[str],
+    qsar_guids: List[str],
+) -> List[str]:
+    follow_ups: List[str] = []
+    if not source_analogues:
+        follow_ups.append(
+            "Provide candidate source analogues or category members so the dossier can move from exploratory evidence collection to an actual read-across case."
+        )
+    if similarity_assessment["structural_similarity"]["status"] != "assessed":
+        follow_ups.append(
+            "Add richer structure-distance metrics or calculator-backed physicochemical descriptors if you want stronger analogue adequacy support than the current record-derived comparisons."
+        )
+    if not profiler_guids:
+        follow_ups.append(
+            "Run at least one endpoint-relevant profiler to strengthen the reactivity and mechanistic rationale."
+        )
+    if not simulator_guids:
+        follow_ups.append(
+            "Add metabolism simulator evidence when ADME/TK or metabolite similarity is part of the grouping hypothesis."
+        )
+    if not qsar_guids:
+        follow_ups.append(
+            "Attach endpoint-specific QSAR model runs or empirical study data to reinforce toxicological support."
+        )
+    if not uncertainty_assessment.get("acceptable_for_context"):
+        follow_ups.append(
+            "Residual uncertainty is above the accepted level; either collect bridging evidence or narrow the decision context."
+        )
+    return _unique(follow_ups)
+
+
+def _build_grouping_markdown(
+    report_context: Dict[str, Any],
+    target_substance: Dict[str, Any],
+    source_analogues: List[Dict[str, Any]],
+    excluded_analogues: List[Dict[str, Any]],
+    structure_comparison: Dict[str, Any],
+    physicochemical_comparison: Dict[str, Any],
+    evidence_matrix: List[Dict[str, Any]],
+    endpoint_justifications: List[Dict[str, Any]],
+    uncertainty_assessment: Dict[str, Any],
+    recommended_follow_ups: List[str],
+) -> str:
+    lines = ["## OECD Grouping Justification", ""]
+    lines.append(f"* Decision context: {report_context['decision_context']}")
+    lines.append(f"* Problem formulation: {report_context['problem_formulation']}")
+    lines.append(f"* Grouping hypothesis: {report_context['grouping_hypothesis']}")
+    lines.append(
+        f"* Endpoints: {', '.join(report_context['endpoints'])}"
+    )
+    if report_context.get("route_of_exposure"):
+        lines.append(
+            f"* Route of exposure: {report_context['route_of_exposure']}"
+        )
+    if report_context.get("context"):
+        lines.append(f"* Additional context: {report_context['context']}")
+
+    lines.extend(["", "### Target and Analogues", ""])
+    cas_value = target_substance.get("cas") or "n/a"
+    lines.append(
+        f"* Target: **{target_substance.get('preferred_name', report_context['identifier'])}** (chemId `{target_substance.get('chem_id')}` · CAS {cas_value})"
+    )
+    if source_analogues:
+        analogue_text = ", ".join(
+            f"{item.get('preferred_name')} (chemId `{item.get('chem_id')}`)"
+            for item in source_analogues
+        )
+        lines.append(f"* Resolved source analogues: {analogue_text}")
+    else:
+        lines.append("* Resolved source analogues: none")
+    if excluded_analogues:
+        excluded_text = ", ".join(
+            f"{item.get('identifier')} ({item.get('reason')})"
+            for item in excluded_analogues
+        )
+        lines.append(f"* Excluded or unresolved analogues: {excluded_text}")
+
+    lines.extend(["", "### Similarity Comparison", ""])
+    structure_summary = structure_comparison.get("summary", {})
+    physchem_summary = physicochemical_comparison.get("summary", {})
+    lines.append(
+        f"* Structural pairs assessed: {structure_summary.get('assessed_pairs', 0)}; canonical exact matches: {structure_summary.get('canonical_exact_matches', 0)}; connectivity exact matches: {structure_summary.get('connectivity_exact_matches', 0)}."
+    )
+    lines.append(
+        f"* Physicochemical descriptor comparisons: {physchem_summary.get('shared_descriptor_count', 0)} across {physchem_summary.get('assessed_pairs', 0)} pair(s)."
+    )
+
+    lines.extend(["", "### Evidence", ""])
+    lines.append(f"* Evidence rows captured: {len(evidence_matrix)}")
+    lines.append(
+        f"* Overall residual uncertainty: **{uncertainty_assessment.get('overall_level', 'high')}**"
+    )
+    lines.append(
+        f"* Acceptable for stated purpose: **{'yes' if uncertainty_assessment.get('acceptable_for_context') else 'no'}**"
+    )
+
+    lines.extend(["", "### Endpoint Conclusions", ""])
+    for endpoint in endpoint_justifications:
+        lines.append(
+            f"* {endpoint['endpoint']}: {endpoint['conclusion']} Confidence: {endpoint['confidence']}; residual uncertainty: {endpoint['residual_uncertainty']}."
+        )
+
+    if recommended_follow_ups:
+        lines.extend(["", "### Recommended Follow-up", ""])
+        for item in recommended_follow_ups:
+            lines.append(f"* {item}")
+
+    return "\n".join(lines)
+
+
+def _build_grouping_response(
+    status: str,
+    identifier: str,
+    summary_markdown: str,
+    log_bundle: Dict[str, Any],
+    grouping_justification: Dict[str, Any],
+    toolbox_meta: Dict[str, Any],
+) -> Dict[str, Any]:
+    log_bundle["final_report"] = summary_markdown
+    log_bundle["grouping_justification"] = grouping_justification
+
+    pdf_buffer = generate_pdf_report(log_bundle)
+    if hasattr(pdf_buffer, "getvalue"):
+        pdf_bytes = pdf_buffer.getvalue()
+    elif isinstance(pdf_buffer, (bytes, bytearray, memoryview)):
+        pdf_bytes = bytes(pdf_buffer)
+    else:  # pragma: no cover - safeguard for unexpected implementations
+        raise TypeError("Unexpected PDF payload produced by generate_pdf_report")
+
+    response = {
+        "status": status,
+        "identifier": identifier,
+        "summary_markdown": summary_markdown,
+        "grouping_justification": grouping_justification,
+        "log_json": log_bundle,
+        "pdf_report_base64": base64.b64encode(pdf_bytes).decode("utf-8"),
+        "portable_handoffs": _build_grouping_portable_handoffs(
+            status, identifier, log_bundle, grouping_justification, toolbox_meta
+        ),
+    }
+    if toolbox_meta.get("calls"):
+        response["toolbox"] = toolbox_meta
+    return response
+
+
+async def build_grouping_justification(
+    identifier: str,
+    search_type: str,
+    problem_formulation: str,
+    decision_context: str,
+    endpoints: List[str],
+    route_of_exposure: Optional[str],
+    grouping_hypothesis: str,
+    analogue_identifiers: List[str],
+    analogue_search_type: str,
+    profiler_guids: List[str],
+    simulator_guids: List[str],
+    qsar_guids: List[str],
+    accepted_uncertainty_level: str,
+    context: Optional[str],
+) -> Dict[str, Any]:
+    endpoints = _unique(endpoints)
+    analogue_identifiers = _unique(analogue_identifiers)
+    profiler_guids = _unique(profiler_guids)
+    simulator_guids = _unique(simulator_guids)
+    qsar_guids = _unique(qsar_guids)
+
+    toolbox_calls: List[Dict[str, Any]] = []
+    log_bundle: Dict[str, Any] = {
+        "identifier": identifier,
+        "inputs": {
+            "identifier": identifier,
+            "search_type": search_type,
+            "problem_formulation": problem_formulation,
+            "decision_context": decision_context,
+            "endpoints": endpoints,
+            "route_of_exposure": route_of_exposure,
+            "grouping_hypothesis": grouping_hypothesis,
+            "analogue_identifiers": analogue_identifiers,
+            "analogue_search_type": analogue_search_type,
+            "profiler_guids": profiler_guids,
+            "simulator_guids": simulator_guids,
+            "qsar_guids": qsar_guids,
+            "accepted_uncertainty_level": accepted_uncertainty_level,
+            "context": context,
+        },
+        "generated_by": "O-QT MCP Server",
+        "target_resolution": None,
+        "analogue_resolutions": [],
+        "excluded_analogues": [],
+        "structure_comparison": {},
+        "physicochemical_comparison": {},
+        "profiler_results": [],
+        "profiler_groupings": [],
+        "simulator_results": [],
+        "qsar_results": [],
+        "data_matrix": [],
+        "errors": [],
+    }
+
+    target_resolution = await _resolve_chemical(
+        identifier, search_type, "grouping/target", toolbox_calls
+    )
+    log_bundle["target_resolution"] = target_resolution
+
+    if target_resolution["status"] != "resolved" or not target_resolution["summary"]:
+        message = target_resolution.get("error") or f"Unable to resolve '{identifier}'."
+        log.warning(message)
+        log_bundle["errors"].append(message)
+        summary_markdown = "\n".join(
+            [
+                "## OECD Grouping Justification",
+                "",
+                f"* Target resolution failed for `{identifier}`.",
+                f"* Reason: {message}",
+            ]
+        )
+        return _build_grouping_response(
+            "not_found",
+            identifier,
+            summary_markdown,
+            log_bundle,
+            {
+                "report_context": {
+                    "identifier": identifier,
+                    "decision_context": decision_context,
+                    "problem_formulation": problem_formulation,
+                    "grouping_hypothesis": grouping_hypothesis,
+                    "endpoints": endpoints,
+                },
+                "target_substance": None,
+                "source_analogues": [],
+                "excluded_analogues": [],
+                "structure_comparison": {},
+                "physicochemical_comparison": {},
+                "data_matrix": [],
+                "similarity_assessment": {},
+                "uncertainty_assessment": {},
+                "endpoint_justifications": [],
+                "recommended_follow_ups": [
+                    "Resolve the target substance in the Toolbox before attempting a grouping dossier."
+                ],
+            },
+            _aggregate_calls(toolbox_calls),
+        )
+
+    target_substance = target_resolution["summary"]
+    target_name = target_substance.get("preferred_name", identifier)
+    target_chem_id = target_substance.get("chem_id")
+    evidence_matrix: List[Dict[str, Any]] = [
+        _build_evidence_row(
+            "target",
+            target_name,
+            "identity",
+            "search_chemicals",
+            "resolved",
+            f"Resolved to chemId `{target_chem_id}`.",
+            reference=str(target_chem_id) if target_chem_id else None,
+        )
+    ]
+
+    source_analogues: List[Dict[str, Any]] = []
+    excluded_analogues: List[Dict[str, Any]] = []
+    for analogue in analogue_identifiers:
+        resolved = await _resolve_chemical(
+            analogue, analogue_search_type, "grouping/analogue", toolbox_calls
+        )
+        log_bundle["analogue_resolutions"].append(resolved)
+        if resolved["status"] == "resolved" and resolved["summary"]:
+            summary = resolved["summary"]
+            if not summary.get("chem_id"):
+                excluded_analogues.append(
+                    {
+                        "identifier": analogue,
+                        "reason": "Resolved record did not expose a chemId.",
+                    }
+                )
+                continue
+            source_analogues.append(summary)
+            evidence_matrix.append(
+                _build_evidence_row(
+                    "source_analogue",
+                    summary.get("preferred_name", analogue),
+                    "identity",
+                    "search_chemicals",
+                    "resolved",
+                    f"Resolved to chemId `{summary.get('chem_id')}`.",
+                    reference=str(summary.get("chem_id")),
+                )
+            )
+        else:
+            excluded_analogues.append(
+                {
+                    "identifier": analogue,
+                    "reason": resolved.get("error") or "No Toolbox record found.",
+                }
+            )
+
+    target_structure_signature = await _collect_structure_signature(
+        target_substance, "target", toolbox_calls
+    )
+    source_structure_signatures: List[Dict[str, Any]] = []
+    for analogue in source_analogues:
+        source_structure_signatures.append(
+            await _collect_structure_signature(
+                analogue, "source_analogue", toolbox_calls
+            )
+        )
+    structure_comparison = _build_structure_comparison(
+        target_structure_signature, source_structure_signatures
+    )
+    physicochemical_comparison = _build_physicochemical_comparison(
+        target_substance, source_analogues
+    )
+    evidence_matrix.extend(_structure_evidence_rows(structure_comparison))
+    evidence_matrix.extend(_physchem_evidence_rows(physicochemical_comparison))
+
+    if not target_chem_id:
+        message = (
+            f"Target '{target_name}' did not expose a chemId, so profiler, grouping, metabolism, and QSAR calls cannot run."
+        )
+        log_bundle["errors"].append(message)
+
+    profiler_results: List[Dict[str, Any]] = []
+    profiler_groupings: List[Dict[str, Any]] = []
+    simulator_results: List[Dict[str, Any]] = []
+    qsar_results: List[Dict[str, Any]] = []
+
+    if target_chem_id:
+        for profiler_guid in profiler_guids:
+            try:
+                payload, meta = await _invoke_with_meta(
+                    qsar_client.profile_with_profiler, profiler_guid, target_chem_id, None
+                )
+                profiler_results.append(
+                    {
+                        "subject_role": "target",
+                        "subject_name": target_name,
+                        "chem_id": target_chem_id,
+                        "profiler_guid": profiler_guid,
+                        "result": payload,
+                    }
+                )
+                entry = _format_meta(
+                    "profiling/execute", meta, profiler_guid=profiler_guid, chem_id=target_chem_id
+                )
+                if entry:
+                    toolbox_calls.append(entry)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "profiler",
+                        "run_profiler",
+                        "ok",
+                        _summarise_payload(payload),
+                        reference=profiler_guid,
+                    )
+                )
+            except QsarClientError as exc:
+                message = f"Profiler {profiler_guid} failed for target {target_name}: {exc}"
+                log.warning(message)
+                log_bundle["errors"].append(message)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "profiler",
+                        "run_profiler",
+                        "error",
+                        str(exc),
+                        reference=profiler_guid,
+                    )
+                )
+
+            try:
+                payload, meta = await _invoke_with_meta(
+                    qsar_client.group_by_profiler, target_chem_id, profiler_guid
+                )
+                profiler_groupings.append(
+                    {
+                        "target_chem_id": target_chem_id,
+                        "profiler_guid": profiler_guid,
+                        "grouping": payload,
+                    }
+                )
+                entry = _format_meta(
+                    "grouping/profile",
+                    meta,
+                    profiler_guid=profiler_guid,
+                    chem_id=target_chem_id,
+                )
+                if entry:
+                    toolbox_calls.append(entry)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "grouping",
+                        "group_chemicals_by_profiler",
+                        "ok",
+                        _summarise_payload(payload),
+                        reference=profiler_guid,
+                    )
+                )
+            except QsarClientError as exc:
+                message = f"Grouping by profiler {profiler_guid} failed for target {target_name}: {exc}"
+                log.warning(message)
+                log_bundle["errors"].append(message)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "grouping",
+                        "group_chemicals_by_profiler",
+                        "error",
+                        str(exc),
+                        reference=profiler_guid,
+                    )
+                )
+
+            for analogue in source_analogues:
+                analogue_name = analogue.get("preferred_name", analogue.get("input_identifier", "Unknown"))
+                analogue_chem_id = analogue.get("chem_id")
+                try:
+                    payload, meta = await _invoke_with_meta(
+                        qsar_client.profile_with_profiler, profiler_guid, analogue_chem_id, None
+                    )
+                    profiler_results.append(
+                        {
+                            "subject_role": "source_analogue",
+                            "subject_name": analogue_name,
+                            "chem_id": analogue_chem_id,
+                            "profiler_guid": profiler_guid,
+                            "result": payload,
+                        }
+                    )
+                    entry = _format_meta(
+                        "profiling/execute",
+                        meta,
+                        profiler_guid=profiler_guid,
+                        chem_id=analogue_chem_id,
+                    )
+                    if entry:
+                        toolbox_calls.append(entry)
+                    evidence_matrix.append(
+                        _build_evidence_row(
+                            "source_analogue",
+                            analogue_name,
+                            "profiler",
+                            "run_profiler",
+                            "ok",
+                            _summarise_payload(payload),
+                            reference=profiler_guid,
+                        )
+                    )
+                except QsarClientError as exc:
+                    message = f"Profiler {profiler_guid} failed for source analogue {analogue_name}: {exc}"
+                    log.warning(message)
+                    log_bundle["errors"].append(message)
+                    evidence_matrix.append(
+                        _build_evidence_row(
+                            "source_analogue",
+                            analogue_name,
+                            "profiler",
+                            "run_profiler",
+                            "error",
+                            str(exc),
+                            reference=profiler_guid,
+                        )
+                    )
+
+        for simulator_guid in simulator_guids:
+            try:
+                payload, meta = await _invoke_with_meta(
+                    qsar_client.simulate_metabolites_for_chem, simulator_guid, target_chem_id
+                )
+                simulator_results.append(
+                    {
+                        "subject_role": "target",
+                        "subject_name": target_name,
+                        "chem_id": target_chem_id,
+                        "simulator_guid": simulator_guid,
+                        "result": payload,
+                    }
+                )
+                entry = _format_meta(
+                    "metabolism/simulate",
+                    meta,
+                    simulator_guid=simulator_guid,
+                    chem_id=target_chem_id,
+                )
+                if entry:
+                    toolbox_calls.append(entry)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "metabolism",
+                        "run_metabolism_simulator",
+                        "ok",
+                        _summarise_payload(payload),
+                        reference=simulator_guid,
+                    )
+                )
+            except QsarClientError as exc:
+                message = f"Simulator {simulator_guid} failed for target {target_name}: {exc}"
+                log.warning(message)
+                log_bundle["errors"].append(message)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "metabolism",
+                        "run_metabolism_simulator",
+                        "error",
+                        str(exc),
+                        reference=simulator_guid,
+                    )
+                )
+
+            for analogue in source_analogues:
+                analogue_name = analogue.get("preferred_name", analogue.get("input_identifier", "Unknown"))
+                analogue_chem_id = analogue.get("chem_id")
+                try:
+                    payload, meta = await _invoke_with_meta(
+                        qsar_client.simulate_metabolites_for_chem,
+                        simulator_guid,
+                        analogue_chem_id,
+                    )
+                    simulator_results.append(
+                        {
+                            "subject_role": "source_analogue",
+                            "subject_name": analogue_name,
+                            "chem_id": analogue_chem_id,
+                            "simulator_guid": simulator_guid,
+                            "result": payload,
+                        }
+                    )
+                    entry = _format_meta(
+                        "metabolism/simulate",
+                        meta,
+                        simulator_guid=simulator_guid,
+                        chem_id=analogue_chem_id,
+                    )
+                    if entry:
+                        toolbox_calls.append(entry)
+                    evidence_matrix.append(
+                        _build_evidence_row(
+                            "source_analogue",
+                            analogue_name,
+                            "metabolism",
+                            "run_metabolism_simulator",
+                            "ok",
+                            _summarise_payload(payload),
+                            reference=simulator_guid,
+                        )
+                    )
+                except QsarClientError as exc:
+                    message = f"Simulator {simulator_guid} failed for source analogue {analogue_name}: {exc}"
+                    log.warning(message)
+                    log_bundle["errors"].append(message)
+                    evidence_matrix.append(
+                        _build_evidence_row(
+                            "source_analogue",
+                            analogue_name,
+                            "metabolism",
+                            "run_metabolism_simulator",
+                            "error",
+                            str(exc),
+                            reference=simulator_guid,
+                        )
+                    )
+
+        for qsar_guid in qsar_guids:
+            try:
+                prediction, apply_meta = await _invoke_with_meta(
+                    qsar_client.apply_qsar_model, qsar_guid, target_chem_id
+                )
+                domain, domain_meta = await _invoke_with_meta(
+                    qsar_client.get_qsar_domain, qsar_guid, target_chem_id
+                )
+                qsar_results.append(
+                    {
+                        "subject_role": "target",
+                        "subject_name": target_name,
+                        "chem_id": target_chem_id,
+                        "qsar_guid": qsar_guid,
+                        "prediction": prediction,
+                        "domain": domain,
+                    }
+                )
+                entry_apply = _format_meta(
+                    "qsar/apply", apply_meta, qsar_guid=qsar_guid, chem_id=target_chem_id
+                )
+                entry_domain = _format_meta(
+                    "qsar/domain", domain_meta, qsar_guid=qsar_guid, chem_id=target_chem_id
+                )
+                if entry_apply:
+                    toolbox_calls.append(entry_apply)
+                if entry_domain:
+                    toolbox_calls.append(entry_domain)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "qsar",
+                        "run_qsar_model",
+                        "ok",
+                        f"Prediction: {_summarise_payload(prediction)} Domain: {_summarise_payload(domain)}",
+                        reference=qsar_guid,
+                    )
+                )
+            except QsarClientError as exc:
+                message = f"QSAR model {qsar_guid} failed for target {target_name}: {exc}"
+                log.warning(message)
+                log_bundle["errors"].append(message)
+                evidence_matrix.append(
+                    _build_evidence_row(
+                        "target",
+                        target_name,
+                        "qsar",
+                        "run_qsar_model",
+                        "error",
+                        str(exc),
+                        reference=qsar_guid,
+                    )
+                )
+
+    similarity_assessment = _build_similarity_assessment(
+        source_analogues,
+        structure_comparison,
+        physicochemical_comparison,
+        profiler_results,
+        profiler_groupings,
+        simulator_results,
+        qsar_results,
+        grouping_hypothesis,
+    )
+    uncertainty_assessment = _build_uncertainty_assessment(
+        similarity_assessment,
+        accepted_uncertainty_level,
+        source_analogues,
+    )
+    endpoint_justifications = _build_endpoint_justifications(
+        endpoints,
+        source_analogues,
+        similarity_assessment,
+        uncertainty_assessment,
+        grouping_hypothesis,
+        decision_context,
+        route_of_exposure,
+        profiler_guids,
+        simulator_guids,
+        qsar_guids,
+    )
+    recommended_follow_ups = _build_recommended_follow_ups(
+        source_analogues,
+        similarity_assessment,
+        uncertainty_assessment,
+        profiler_guids,
+        simulator_guids,
+        qsar_guids,
+    )
+
+    report_context = {
+        "identifier": identifier,
+        "search_type": search_type,
+        "problem_formulation": problem_formulation,
+        "decision_context": decision_context,
+        "grouping_hypothesis": grouping_hypothesis,
+        "endpoints": endpoints,
+        "route_of_exposure": route_of_exposure,
+        "accepted_uncertainty_level": accepted_uncertainty_level,
+        "context": context,
+    }
+    grouping_justification = {
+        "report_context": report_context,
+        "target_substance": target_substance,
+        "source_analogues": source_analogues,
+        "excluded_analogues": excluded_analogues,
+        "structure_comparison": structure_comparison,
+        "physicochemical_comparison": physicochemical_comparison,
+        "data_matrix": evidence_matrix,
+        "similarity_assessment": similarity_assessment,
+        "uncertainty_assessment": uncertainty_assessment,
+        "endpoint_justifications": endpoint_justifications,
+        "recommended_follow_ups": recommended_follow_ups,
+    }
+
+    summary_markdown = _build_grouping_markdown(
+        report_context,
+        target_substance,
+        source_analogues,
+        excluded_analogues,
+        structure_comparison,
+        physicochemical_comparison,
+        evidence_matrix,
+        endpoint_justifications,
+        uncertainty_assessment,
+        recommended_follow_ups,
+    )
+
+    log_bundle["excluded_analogues"] = excluded_analogues
+    log_bundle["structure_comparison"] = structure_comparison
+    log_bundle["physicochemical_comparison"] = physicochemical_comparison
+    log_bundle["profiler_results"] = profiler_results
+    log_bundle["profiler_groupings"] = profiler_groupings
+    log_bundle["simulator_results"] = simulator_results
+    log_bundle["qsar_results"] = qsar_results
+    log_bundle["data_matrix"] = evidence_matrix
+
+    status = "ok"
+    if log_bundle["errors"]:
+        status = "partial"
+
+    toolbox_meta = _aggregate_calls(toolbox_calls)
+    if toolbox_meta.get("calls"):
+        log_bundle["toolbox"] = toolbox_meta
+
+    return _build_grouping_response(
+        status,
+        identifier,
+        summary_markdown,
+        log_bundle,
+        grouping_justification,
+        toolbox_meta,
+    )
 
 
 def register_workflow_tool() -> None:
@@ -468,6 +2617,12 @@ def register_workflow_tool() -> None:
         description="Deprecated alias for run_oqt_multiagent_workflow. Executes the O-QT multi-agent orchestration and returns structured results plus artifacts.",
         parameters_model=WorkflowParams,
         implementation=run_oqt_multiagent_workflow,
+    )
+    tool_registry.register(
+        name="build_grouping_justification",
+        description="Builds an OECD-style grouping/read-across dossier by resolving a target and source analogues, collecting profiler/metabolism/QSAR evidence, and returning a structured justification with uncertainty reporting.",
+        parameters_model=GroupingJustificationParams,
+        implementation=build_grouping_justification,
     )
 
 

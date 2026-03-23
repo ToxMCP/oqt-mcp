@@ -1,0 +1,53 @@
+{
+  "schemaName": "oqtHazardEvidenceSummary",
+  "schemaVersion": "v1",
+  "module": "oqt-mcp",
+  "chemicalIdentity": {
+    "inputIdentifier": "Benzene",
+    "preferredName": "Benzene",
+    "chemId": "019a0835-99ea-7828-a2a1-2821354f4753",
+    "cas": "71-43-2",
+    "smiles": "c1ccccc1"
+  },
+  "profilers": [
+    {
+      "profilerGuid": "a06271f5-944e-4892-b0ad-fa5f7217ec14",
+      "status": "ok",
+      "summary": "Profiler classified the substance under baseline narcosis-related behavior.",
+      "endpoint": "Acute aquatic toxicity"
+    }
+  ],
+  "metabolismFindings": [
+    {
+      "simulatorGuid": "simulator-guid-1",
+      "status": "ok",
+      "summary": "Metabolism simulation returned a non-empty metabolite set for the target substance."
+    }
+  ],
+  "qsarFindings": [
+    {
+      "qsarGuid": "qsar-guid-1",
+      "status": "ok",
+      "predictionSummary": "QSAR prediction completed successfully for the selected endpoint.",
+      "domainSummary": "Applicability domain check reported in-domain coverage."
+    }
+  ],
+  "applicabilityNotes": [
+    "Current WebAPI client targets /api/v6 compatibility routes.",
+    "Interpretation should remain within O-QT's module scope and be combined with other suite evidence upstream."
+  ],
+  "provenance": {
+    "workflowId": "oqtwf-benzene-20260323-0001",
+    "sourceSystem": "OECD QSAR Toolbox WebAPI",
+    "generatedBy": "O-QT MCP Server v0.2.0",
+    "generatedAt": "2026-03-23T09:30:00Z",
+    "references": [
+      "https://github.com/ToxMCP/oqt-mcp"
+    ]
+  },
+  "limitations": [
+    "This summary does not replace final suite-level evidence synthesis.",
+    "A licensed OECD QSAR Toolbox instance is required for live regeneration."
+  ],
+  "context": "Publication-grade hazard assessment"
+}

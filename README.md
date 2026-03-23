@@ -1,35 +1,112 @@
-[![CI](https://github.com/ToxMCP/oqt-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ToxMCP/oqt-mcp/actions/workflows/ci.yml)
+# O-QT MCP Server [![CI](https://github.com/ToxMCP/oqt-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ToxMCP/oqt-mcp/actions/workflows/ci.yml) [![DOI](https://img.shields.io/badge/DOI-10.64898%2F2026.02.06.703989-blue)](https://doi.org/10.64898/2026.02.06.703989) [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE) [![Release](https://img.shields.io/github/v/release/ToxMCP/oqt-mcp?sort=semver)](https://github.com/ToxMCP/oqt-mcp/releases) [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+
+> Part of **ToxMCP** Suite -> https://github.com/ToxMCP/toxmcp
+>
+> O-QT MCP is the ToxMCP suite's specialized OECD QSAR Toolbox workflow engine.
+> It is designed to be consumed by downstream orchestrators or any other MCP-compatible client.
+
+**Public MCP endpoint for the OECD QSAR Toolbox.**  
+Run QSAR workflows, grouping/read-across dossiers, and audit-ready PDF reports through any MCP-aware agent (Claude Code, Codex CLI, Gemini CLI, etc.).
 
 ## Architecture
 
-![O-QT MCP architecture](./assets/oqt-mcp-architecture.jpg)
+```mermaid
+flowchart LR
+    subgraph Clients["Clients and Agents"]
+        Codex["Codex CLI / Desktop"]
+        Claude["Claude Code"]
+        Gemini["Gemini CLI"]
+        Orchestrator["Downstream orchestrator"]
+    end
 
-[![DOI](https://img.shields.io/badge/DOI-10.64898%2F2026.02.06.703989-blue)](https://doi.org/10.64898/2026.02.06.703989)
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
-[![Release](https://img.shields.io/github/v/release/ToxMCP/oqt-mcp?sort=semver)](https://github.com/ToxMCP/oqt-mcp/releases)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+    subgraph API["O-QT MCP Service"]
+        Router["FastAPI + JSON-RPC\n/health, /mcp"]
+        Registry["Tool registry\ninputSchema + discovery"]
+        Primary["Primary workflow surface\nrun_oqt_multiagent_workflow"]
+        Secondary["Secondary expert tools\nprofilers, QSAR, grouping, PDF"]
+    end
 
-# O-QT MCP Server
+    subgraph Engine["OECD QSAR Toolbox Engine"]
+        Workflow["Workflow orchestration\nsearch, profiling, metabolism, QSAR"]
+        Grouping["Grouping and read-across dossier builder"]
+        Artifacts["Structured artifacts\nJSON, Markdown, PDF"]
+    end
 
-> Part of **ToxMCP** Suite → https://github.com/ToxMCP/toxmcp
+    subgraph Contracts["Contract Layer"]
+        Portable["Portable handoff schemas\nschemas/"]
+        Docs["Boundary docs\nREADME + docs/architecture.md"]
+    end
 
+    Toolbox["OECD QSAR Toolbox WebAPI"]
 
-**Public MCP endpoint for the OECD QSAR Toolbox.**  
-Run QSAR workflows, stream structured outputs, and download audit-ready PDF reports through any MCP-aware agent (Claude Code, Codex CLI, Gemini CLI, etc.).
+    Clients --> Router
+    Router --> Registry
+    Registry --> Primary
+    Registry --> Secondary
+    Primary --> Workflow
+    Secondary --> Workflow
+    Secondary --> Grouping
+    Workflow --> Artifacts
+    Grouping --> Artifacts
+    Workflow --> Toolbox
+    Grouping --> Toolbox
+    Artifacts --> Portable
+    Portable --> Orchestrator
+    Docs --> Orchestrator
+```
+
+The current implementation follows a layered model:
+
+- `run_oqt_multiagent_workflow` is the primary workflow entrypoint for downstream automation.
+- Lower-level Toolbox tools remain public for expert use, debugging, and custom orchestration.
+- Portable handoff schemas live under `schemas/` and carry O-QT-owned evidence forward without turning O-QT into the suite orchestrator.
+- Final suite-level evidence synthesis, BER/WoE logic, and cross-module decisions belong above O-QT in a downstream orchestrator.
+
+See [docs/architecture.md](docs/architecture.md) for the fuller boundary and contract notes.
+
+## What's New In v0.2.0
+
+This is a maturity and contract release, not a redesign.
+
+- Re-aligned repository identity, package metadata, and release notes around `ToxMCP/oqt-mcp`.
+- Clarified the public surface as a primary workflow engine plus secondary expert tools.
+- Published portable O-QT handoff schemas for hazard evidence, read-across support, and workflow provenance.
+- Added explicit downstream-orchestration documentation and examples for contract consumers.
+- Documented the current synchronous deployment model instead of implying an async platform that does not exist yet.
+
+## Published Schemas
+
+Portable O-QT handoff objects are now published as machine-readable JSON Schemas under `schemas/`, with matching examples under `schemas/examples/`.
+
+Published object family:
+
+- `schemas/oqtHazardEvidenceSummary.v1.json`
+- `schemas/oqtReadAcrossSummary.v1.json`
+- `schemas/oqtWorkflowRecord.v1.json`
+
+Design intent:
+
+- These are handoff objects, not final decision objects.
+- O-QT owns Toolbox-native workflow evidence, grouping/read-across packaging, and provenance.
+- Final suite-level evidence synthesis belongs in a downstream orchestrator, not inside O-QT MCP.
+- Example instances live under `schemas/examples/` and are validated in tests.
 
 ## Why this project exists
 
-Chemical safety work often relies on the proprietary OECD QSAR Toolbox desktop application. Scientists have to click through many screens to gather profilers, metabolism simulators, and QSAR predictions before writing regulatory reports.  
+Chemical safety work often relies on the proprietary OECD QSAR Toolbox desktop application. Scientists have to click through many screens to gather profilers, metabolism simulators, and QSAR predictions before writing regulatory reports.
 
 The O-QT MCP server turns that workflow into an **open, programmable interface**:
 
-- **Single MCP tool (`run_oqt_multiagent_workflow`, formerly `run_qsar_workflow`)** orchestrates the same multi-agent pipeline used in the O-QT AI Assistant.
+- **Primary workflow entrypoint**: `run_oqt_multiagent_workflow` orchestrates the same multi-agent pipeline used in the O-QT AI Assistant.
 - **Structured JSON + Markdown + PDF** responses are returned in one call, ready for downstream automation.
-- **Vendor-neutral** – any coding agent that speaks MCP can trigger analyses and capture outputs.
+- **Expert helper surface**: lower-level Toolbox tools remain available for debugging, specialist review, and custom orchestration.
+- **Vendor-neutral**: any coding agent that speaks MCP can trigger analyses and capture outputs.
 
 > Looking for the original assistant UI? See [O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant). The MCP server reuses the same core logic but wraps it in a secure, headless API designed for automation.
 >
-> Related publication: [O-QT assistant: a multi-agent AI system for streamlined chemical hazard assessment and read-across analysis using the OECD QSAR toolbox API](https://doi.org/10.1016/j.comtox.2025.100395).
+> Related publication: [Artificial intelligence for integrated chemical safety assessment using OECD QSAR Toolbox](https://doi.org/10.1016/j.comtox.2025.100395).
+>
+> bioRxiv preprint: [10.64898/2026.02.06.703989v1 (Ivo Djidrovski et al.)](https://www.biorxiv.org/content/10.64898/2026.02.06.703989v1).
 
 ---
 
@@ -37,55 +114,53 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 
 | Capability | Description |
 | --- | --- |
-| 🧬 **QSAR Workflow Automation** | Calls the OECD QSAR Toolbox WebAPI to run searches, profilers, metabolism simulators, and curated QSAR models. |
-| 🧾 **Regulatory-Ready Reporting** | Generates a comprehensive PDF (ReportLab), Markdown narrative, and JSON provenance bundle. |
-| 🔐 **Enterprise Security** | OAuth2/OIDC token validation, RBAC per tool, audit logging, Docker hardening. |
-| ⚙️ **MCP Native** | Full JSON‑RPC 2.0 compliance with `initialize`, `listTools`, `callTool`, `shutdown`. |
-| 🤖 **Agent Friendly** | Tested with Claude Code, Codex CLI, and Gemini CLI (see [integration guide](docs/integration_guides/mcp_integration.md)). |
+| **Primary workflow engine** | Calls the OECD QSAR Toolbox WebAPI to run searches, profilers, metabolism simulators, curated QSAR models, and the flagship `run_oqt_multiagent_workflow` entrypoint. |
+| **Grouping/read-across support** | Builds OECD-style grouping dossiers through `build_grouping_justification` with structured similarity and uncertainty reporting. |
+| **Portable handoff contracts** | Publishes stable cross-suite handoff schemas for downstream orchestrators and other contract consumers. |
+| **Regulatory-ready reporting** | Generates a comprehensive PDF (ReportLab), Markdown narrative, and JSON provenance bundle. |
+| **Enterprise security** | OAuth2/OIDC token validation, RBAC per tool, audit logging, and Docker hardening. |
+| **Agent friendly** | Tested with Claude Code, Codex CLI, and Gemini CLI (see [integration guide](docs/integration_guides/mcp_integration.md)). |
 
 ---
 
 ## Table of contents
 
-1. [Quick start](#quick-start)
-2. [Related resources](#related-resources)
-3. [Configuration](#configuration)
-4. [Tool catalog](#tool-catalog)
-5. [Running the server](#running-the-server)
-6. [Integrating with coding agents](#integrating-with-coding-agents)
-7. [Output artifacts](#output-artifacts)
-8. [Security checklist](#security-checklist)
-9. [Development notes](#development-notes)
-10. [Roadmap](#roadmap)
-11. [License](#license)
+1. [Architecture](#architecture)
+2. [What's New In v0.2.0](#whats-new-in-v020)
+3. [Published Schemas](#published-schemas)
+4. [Quick start](#quick-start)
+5. [Related resources](#related-resources)
+6. [Configuration](#configuration)
+7. [Public surface model](#public-surface-model)
+8. [Tool catalog](#tool-catalog)
+9. [Running the server](#running-the-server)
+10. [Deployment modes](#deployment-modes)
+11. [Integrating with coding agents](#integrating-with-coding-agents)
+12. [Downstream orchestration](#downstream-orchestration)
+13. [Output artifacts](#output-artifacts)
+14. [Security checklist](#security-checklist)
+15. [Current limitations](#current-limitations)
+16. [Development notes](#development-notes)
+17. [Roadmap](#roadmap)
+18. [License](#license)
 
 ---
 
 ## Quickstart TL;DR
 
 ```bash
-# 1) install
 poetry install
-
-# 2) configure
 cp .env.example .env
-# (set QSAR_TOOLBOX_API_URL in .env)
-
-# 3) run
-poetry run uvicorn src.api.server:app --reload --port 8001
-
-# 4) verify
-curl -s http://localhost:8001/health | jq .
-curl -s http://localhost:8001/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq .
+# set QSAR_TOOLBOX_API_URL in .env
+poetry run uvicorn src.api.server:app --reload --host 0.0.0.0 --port 8000
+curl -s http://localhost:8000/health | jq .
 ```
 
 ## Quick start
 
 ```bash
-git clone https://github.com/senseibelbi/O_QT_MCP.git
-cd O_QT_MCP/o-qt-mcp-server
+git clone https://github.com/ToxMCP/oqt-mcp.git
+cd oqt-mcp
 poetry install
 cp .env.example .env
 poetry run uvicorn src.api.server:app --reload
@@ -93,30 +168,18 @@ poetry run uvicorn src.api.server:app --reload
 
 > **Important:** The server needs access to a running OECD QSAR Toolbox WebAPI instance (typically on a Windows host). Set `QSAR_TOOLBOX_API_URL` in `.env` to point to it.
 
-Once running, your MCP host connects to `http://localhost:8001/mcp`.
+Once running, your MCP host connects to `http://localhost:8000/mcp`.
 
 ---
 
 ## Related resources
 
+- **ToxMCP suite overview:** [ToxMCP/toxmcp](https://github.com/ToxMCP/toxmcp)
 - **Original interactive UI (Streamlit app):** [VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant](https://github.com/VHP4Safety/O-QT-OECD-QSAR-Toolbox-AI-assistant)
 - **Peer-reviewed publication:** [Artificial intelligence for integrated chemical safety assessment using OECD QSAR Toolbox](https://doi.org/10.1016/j.comtox.2025.100395)
+- **bioRxiv preprint (Ivo Djidrovski et al.):** [10.64898/2026.02.06.703989v1](https://www.biorxiv.org/content/10.64898/2026.02.06.703989v1)
 
 ---
-
-## Verification (smoke test)
-
-Once the server is running:
-
-```bash
-# health
-curl -s http://localhost:8001/health | jq .
-
-# list MCP tools
-curl -s http://localhost:8001/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq .
-```
 
 ## Configuration
 
@@ -135,7 +198,18 @@ curl -s http://localhost:8001/mcp \
 | `ASSISTANT_MODEL` | Optional | `gpt-4.1-nano` | LLM identifier to use when the assistant path is enabled. |
 | `ASSISTANT_API_KEY` | Optional | – | API key for the selected provider. Falls back to `OPENAI_API_KEY` / `OPENROUTER_API_KEY` if absent. |
 
+Compatibility note: the current client targets Toolbox WebAPI `/api/v6` routes. Newer Toolbox builds are supported as long as they keep the v6 compatibility layer enabled.
+
 See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and bypass mode safety.
+
+---
+
+## Public surface model
+
+- **Primary mode:** `run_oqt_multiagent_workflow` is the recommended default entrypoint for downstream automation.
+- **Secondary helper tools:** lower-level Toolbox tools remain public for expert use, debugging, and custom orchestration.
+- **Grouping/read-across:** `build_grouping_justification` packages O-QT-native dossier evidence without claiming suite-level final decisions.
+- **Suite boundary:** final evidence synthesis and decision logic belong to a downstream orchestrator, not to O-QT MCP itself.
 
 ---
 
@@ -144,6 +218,7 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | Tool | Description |
 | --- | --- |
 | `run_oqt_multiagent_workflow` | Executes the full O-QT multi-agent pipeline (search + profiling + optional QSAR) and returns structured JSON results, Markdown narrative, and a PDF report. |
+| `build_grouping_justification` | Builds an OECD-style grouping/read-across dossier with structured context, similarity assessment, uncertainty reporting, and PDF output. |
 | `list_profilers` | Lists profilers configured inside the OECD QSAR Toolbox. |
 | `get_profiler_info` | Provides metadata, categories, and literature links for a specific profiler. |
 | `list_simulators` | Lists metabolism simulators (e.g., liver, skin, microbial). |
@@ -166,6 +241,7 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `canonicalize_structure` | Returns the canonical SMILES for a structure. |
 | `structure_connectivity` | Returns the connectivity string for the supplied SMILES. |
 | `render_pdf_from_log` | Generates the regulatory PDF from a stored comprehensive log (no rerun). |
+| `build_portable_handoffs_from_log` | Reconstructs schema-aligned `portable_handoffs` from a stored O-QT log bundle (no rerun). |
 
 ### `run_oqt_multiagent_workflow` parameters
 
@@ -182,6 +258,25 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `llm_model` | string | – | LLM model identifier. |
 | `llm_api_key` | string | – | API key when not provided via environment. |
 
+### `build_grouping_justification` parameters
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `identifier` | string | ✅ | Target chemical identifier (name, CAS, or SMILES). |
+| `search_type` | enum(`auto`,`name`,`cas`,`smiles`) | – | How to interpret the target identifier. |
+| `problem_formulation` | string | ✅ | Intended use of the grouping or read-across exercise. |
+| `decision_context` | string | ✅ | Context such as screening, hazard identification, or risk assessment. |
+| `endpoints` | array[string] | ✅ | Endpoint list to justify in the dossier. |
+| `route_of_exposure` | string | – | Optional route of exposure relevant to the endpoints. |
+| `grouping_hypothesis` | string | ✅ | Why the target and source chemicals are expected to be sufficiently similar. |
+| `analogue_identifiers` | array[string] | – | Candidate source analogues or category members to resolve in the Toolbox. |
+| `analogue_search_type` | enum(`auto`,`name`,`cas`,`smiles`) | – | How to interpret the analogue identifiers. |
+| `profiler_guids` | array[string] | – | Profilers used to support the similarity rationale. |
+| `simulator_guids` | array[string] | – | Metabolism simulators used to support ADME/TK similarity. |
+| `qsar_guids` | array[string] | – | QSAR models used as supporting evidence for the target substance. |
+| `accepted_uncertainty_level` | enum(`low`,`medium`,`high`) | – | Maximum residual uncertainty tolerated for the stated purpose. |
+| `context` | string | – | Optional extra narrative instructions for the dossier. |
+
 ### Response payload
 
 ```jsonc
@@ -190,7 +285,11 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
   "identifier": "Acetone",
   "summary_markdown": "...",
   "log_json": { "...": "..." },
-  "pdf_report_base64": "JVBERi0xLjcKJ..."
+  "pdf_report_base64": "JVBERi0xLjcKJ...",
+  "portable_handoffs": {
+    "oqtWorkflowRecord.v1": { "...": "..." },
+    "oqtHazardEvidenceSummary.v1": { "...": "..." }
+  }
 }
 ```
 
@@ -199,7 +298,10 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
   - `assistant_session` (provider/model, duration, specialist outputs)  
   - `mcp_workflow` (deterministic fallback summary and Toolbox metadata)  
   - `analysis`, `data_retrieval`, and other sections reused by the original app.
+- `build_grouping_justification` adds a `grouping_justification` object with target/analogue resolution, similarity assessment, endpoint conclusions, and uncertainty reporting.
 - `pdf_report_base64` – base64-encoded, publication-ready PDF.
+- `portable_handoffs` – schema-aligned handoff objects for downstream orchestration. `build_grouping_justification` returns `oqtWorkflowRecord.v1` plus `oqtReadAcrossSummary.v1`; `run_oqt_multiagent_workflow` returns `oqtWorkflowRecord.v1` plus `oqtHazardEvidenceSummary.v1`.
+- Portable downstream contracts are published separately under `schemas/`; see [schemas/README.md](schemas/README.md).
 
 ---
 
@@ -214,51 +316,81 @@ poetry run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 
 ### Quick MCP smoke test
 
-Once the server is running on `http://localhost:8001/mcp` (and your `.env` points to a reachable Toolbox WebAPI), the following curl invocations exercise the main tools with Benzene as an example:
+Once the server is running on `http://localhost:8000/mcp` (and your `.env` points to a reachable Toolbox WebAPI), the following curl invocations exercise the main tools with Benzene as an example:
 
 ```bash
 # 1. Handshake and tool discovery
-curl -s http://localhost:8001/mcp \
+curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}'
 
-curl -s http://localhost:8001/mcp \
+curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":2,"method":"mcp/tool/list","params":{}}' | jq '.result.tools | length'
 
 # 2. Resolve Benzene and pull discovery metadata
-curl -s http://localhost:8001/mcp \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"mcp/tool/call","params":{"name":"search_chemicals","parameters":{"query":"Benzene","search_type":"name"}}}' | jq '.result[0]'
+BENZENE_CHEMID=$(
+  curl -s http://localhost:8000/mcp \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3,"method":"mcp/tool/call","params":{"name":"search_chemicals","parameters":{"query":"Benzene","search_type":"name"}}}' \
+  | jq -r '.result.content[0].text | fromjson | .items[0].ChemId'
+)
 
-curl -s http://localhost:8001/mcp \
+echo "$BENZENE_CHEMID"
+
+curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":4,"method":"mcp/tool/call","params":{"name":"list_profilers","parameters":{}}}' | jq '.result.profilers[:5]'
+  -d '{"jsonrpc":"2.0","id":4,"method":"mcp/tool/call","params":{"name":"list_profilers","parameters":{}}}' \
+  | jq -r '.result.content[0].text | fromjson | .profilers[:5]'
 
 # 3. Execute profilers / QSAR workflow (uses chemId from the first search hit)
-BENZENE_CHEMID="019a0835-99ea-7828-a2a1-2821354f4753"
 PROFILER_GUID="a06271f5-944e-4892-b0ad-fa5f7217ec14"
 
-curl -s http://localhost:8001/mcp \
+curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_profiler\",\"parameters\":{\"profiler_guid\":\"$PROFILER_GUID\",\"chem_id\":\"$BENZENE_CHEMID\"}}}" | jq '.result.result'
+  -d "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_profiler\",\"parameters\":{\"profiler_guid\":\"$PROFILER_GUID\",\"chem_id\":\"$BENZENE_CHEMID\"}}}" \
+  | jq -r '.result.content[0].text | fromjson | .result'
 
-curl -s http://localhost:8001/mcp \
+curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_oqt_multiagent_workflow\",\"parameters\":{\"identifier\":\"Benzene\",\"search_type\":\"name\",\"profiler_guids\":[\"$PROFILER_GUID\"]}}}" | jq '{status: .result.status, summary: .result.summary_markdown, pdf_bytes: (.result.pdf_report_base64 | length)}'
+  -d "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_oqt_multiagent_workflow\",\"parameters\":{\"identifier\":\"Benzene\",\"search_type\":\"name\",\"profiler_guids\":[\"$PROFILER_GUID\"]}}}" \
+  | jq -r '.result.content[0].text | fromjson | {status: .status, summary: .summary_markdown, pdf_bytes: (.pdf_report_base64 | length)}'
 
 # 4. Optional helpers
-curl -s http://localhost:8001/mcp \
+curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":7,"method":"mcp/tool/call","params":{"name":"canonicalize_structure","parameters":{"smiles":"c1ccccc1"}}}'
+  -d '{"jsonrpc":"2.0","id":7,"method":"mcp/tool/call","params":{"name":"canonicalize_structure","parameters":{"smiles":"c1ccccc1"}}}' \
+  | jq -r '.result.content[0].text | fromjson'
+
+# 5. Build an OECD-style grouping/read-across dossier
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"build_grouping_justification\",\"parameters\":{\"identifier\":\"Benzene\",\"search_type\":\"name\",\"problem_formulation\":\"Assess whether close aromatic hydrocarbon analogues can support exploratory read-across for repeated-dose toxicity.\",\"decision_context\":\"hazard_identification\",\"endpoints\":[\"Repeated dose toxicity\"],\"route_of_exposure\":\"oral\",\"grouping_hypothesis\":\"Target and source analogues are simple aromatic hydrocarbons expected to share related structural, mechanistic, and metabolic features.\",\"analogue_identifiers\":[\"Toluene\",\"Ethylbenzene\"],\"analogue_search_type\":\"name\",\"profiler_guids\":[\"$PROFILER_GUID\"],\"accepted_uncertainty_level\":\"medium\"}}}" \
+  | jq -r '.result.content[0].text | fromjson | {status: .status, uncertainty: .grouping_justification.uncertainty_assessment.overall_level, structure: .grouping_justification.structure_comparison.summary, physchem: .grouping_justification.physicochemical_comparison.summary}'
+
+# 6. Rebuild portable handoffs from a stored log bundle (no Toolbox rerun)
+WORKFLOW_RESPONSE=$(
+  curl -s http://localhost:8000/mcp \
+    -H 'Content-Type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"run_oqt_multiagent_workflow\",\"parameters\":{\"identifier\":\"Benzene\",\"search_type\":\"name\",\"profiler_guids\":[\"$PROFILER_GUID\"]}}}"
+)
+
+WORKFLOW_LOG=$(echo "$WORKFLOW_RESPONSE" | jq -c '.result.content[0].text | fromjson | .log_json')
+
+curl -s http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"mcp/tool/call\",\"params\":{\"name\":\"build_portable_handoffs_from_log\",\"parameters\":{\"log\":$WORKFLOW_LOG}}}" \
+  | jq -r '.result.content[0].text | fromjson | .portable_handoffs | keys'
 ```
 
 You should see:
 
-- Tool listing reporting 27 tools.
+- Tool listing reporting around 31 tools (including compatibility aliases).
 - `search_chemicals` resolving Benzene to a Toolbox `chemId`.
 - Profiler execution returning the “Class 1 (narcosis or baseline toxicity)” call.
 - `run_oqt_multiagent_workflow` producing a Markdown summary along with a non-empty Base64 PDF payload (written to disk automatically when invoked via Codex, Claude, or Gemini CLIs).
+- `build_portable_handoffs_from_log` regenerating `oqtWorkflowRecord.v1` and the matching domain handoff object from a stored `log_json`.
+- `GET /mcp` returning `405 Method Not Allowed` is expected; use JSON-RPC `POST` requests.
 
 ### Docker
 
@@ -299,6 +431,18 @@ Update `.env` to point at a real Toolbox instance before production use.
 
 ---
 
+## Deployment modes
+
+| Profile | Shape | Suitable for | Notes |
+| --- | --- | --- | --- |
+| `local-dev` | Single FastAPI process, optional auth bypass | Workstation development, smoke tests, prompt-driven debugging | Calls the Toolbox WebAPI synchronously. |
+| `controlled-prod` | FastAPI behind TLS reverse proxy with OIDC, RBAC, and audit shipping | Internal deployments and orchestrated suite flows | Still synchronous in v0.2.0; scale with worker policy and operational guardrails rather than a built-in queue. |
+| `not-in-v0.2.0` | Async queue and persistence layer | Detached batch jobs and large-scale job replay | Remains roadmap work. |
+
+This release intentionally tightens the deployment story instead of over-claiming platform maturity.
+
+---
+
 ## Integrating with coding agents
 
 Follow [docs/integration_guides/mcp_integration.md](docs/integration_guides/mcp_integration.md) for step-by-step instructions covering:
@@ -312,6 +456,31 @@ Each guide includes JSON snippets for provider configuration and tips for handli
 
 ---
 
+## Downstream orchestration
+
+O-QT is a module-scoped engine inside the broader suite. A typical orchestrated flow is:
+
+1. A downstream orchestrator calls `run_oqt_multiagent_workflow` for Toolbox-native hazard evidence or `build_grouping_justification` for read-across support.
+2. O-QT returns live MCP artifacts and a `portable_handoffs` block aligned with the published contracts under `schemas/`.
+3. The orchestrator combines O-QT output with other suite evidence before any higher-level synthesis or decision support step.
+
+See [docs/integration_orchestrators.md](docs/integration_orchestrators.md) for a worked example.
+
+```json
+{
+  "oqt_module_role": "specialized OECD QSAR Toolbox engine",
+  "default_entrypoint": "run_oqt_multiagent_workflow",
+  "published_handoff_objects": [
+    "oqtWorkflowRecord.v1",
+    "oqtHazardEvidenceSummary.v1",
+    "oqtReadAcrossSummary.v1"
+  ],
+  "suite_orchestrator_role": "A downstream orchestrator combines O-QT with other evidence sources"
+}
+```
+
+---
+
 ## Output artifacts
 
 Every successful run returns three artifacts:
@@ -321,6 +490,7 @@ Every successful run returns three artifacts:
 3. **PDF report** – Built with ReportLab; includes provenance tables, key study badges, and optional logo.
 
 Consumers can store the PDF by decoding `pdf_report_base64` from the tool response.
+Portable cross-suite contract files are versioned separately under `schemas/`.
 
 ---
 
@@ -335,6 +505,14 @@ Consumers can store the PDF by decoding `pdf_report_base64` from the tool respon
 
 ---
 
+## Current limitations
+
+- Execution is synchronous request/response only; O-QT does not yet ship a built-in queue or persistence layer.
+- A licensed OECD QSAR Toolbox installation with a reachable WebAPI is still required.
+- Portable schemas are published contracts for downstream handoff; they do not replace suite-level synthesis or decision logic.
+
+---
+
 ## Development notes
 
 | Command | Purpose |
@@ -346,8 +524,11 @@ Consumers can store the PDF by decoding `pdf_report_base64` from the tool respon
 
 Additional documentation:
 
+- [docs/architecture.md](docs/architecture.md) – module boundary, suite role, and contract notes.
+- [docs/integration_orchestrators.md](docs/integration_orchestrators.md) – downstream orchestration example.
 - [docs/testing.md](docs/testing.md) – local tooling and CI details.
 - [docs/release_process.md](docs/release_process.md) – versioning and release checklist.
+- [schemas/README.md](schemas/README.md) – portable handoff schema inventory.
 - [docs/toolbox_webapi_overview.md](docs/toolbox_webapi_overview.md) – mapping MCP tools to Toolbox endpoints.
 - [SECURITY.md](SECURITY.md) – vulnerability reporting policy.
 
@@ -356,10 +537,16 @@ Additional documentation:
 ## Roadmap
 
 - Streaming progress updates over MCP notifications for long-running QSAR jobs.
-- Additional tools for ad-hoc discovery (e.g., list profilers, fetch model metadata without running full pipeline).
+- Stronger contract gates to keep live MCP outputs and published handoff schemas aligned.
 - Optional job queue and persistence layer for asynchronous execution.
 
 Community feedback and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for details.
+
+---
+
+## Maintainer
+
+Ivo Djidrovski
 
 ---
 
@@ -368,28 +555,3 @@ Community feedback and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBU
 This project is released under the [Apache License 2.0](LICENSE).  
 
 _OECD QSAR Toolbox is proprietary software. Users must supply their own licensed installations and comply with the OECD EULA._
-## Acknowledgements / Origins
-
-ToxMCP was developed in the context of the **VHP4Safety** project (see: https://github.com/VHP4Safety) and related research/engineering efforts.
-
-Funding: Dutch Research Council (NWO) — NWA.1292.19.272 (NWA programme)
-
-This suite integrates with third-party data sources and services (e.g., EPA CompTox, ADMETlab, AOP resources, OECD QSAR Toolbox, Open Systems Pharmacology). Those upstream resources are owned and governed by their respective providers; users are responsible for meeting any access, API key, rate limit, and license/EULA requirements described in each module.
-
-## ✅ Citation
-
-Djidrovski, I. **ToxMCP: Guardrailed, Auditable Agentic Workflows for Computational Toxicology via the Model Context Protocol.** bioRxiv (2026). https://doi.org/10.64898/2026.02.06.703989
-
-```bibtex
-@article{djidrovski2026toxmcp,
-  title   = {ToxMCP: Guardrailed, Auditable Agentic Workflows for Computational Toxicology via the Model Context Protocol},
-  author  = {Djidrovski, Ivo},
-  journal = {bioRxiv},
-  year    = {2026},
-  doi     = {10.64898/2026.02.06.703989},
-  url     = {https://doi.org/10.64898/2026.02.06.703989}
-}
-```
-
-Citation metadata: [`CITATION.cff`](./CITATION.cff)
-

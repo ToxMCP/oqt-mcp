@@ -1,7 +1,7 @@
 [project]
 name = "o-qt-mcp-server"
-version = "0.1.0"
-description = "Model Context Protocol (MCP) Server for the O-QT OECD QSAR Toolbox"
+version = "0.2.0"
+description = "Specialized MCP workflow engine for the OECD QSAR Toolbox inside the ToxMCP suite"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
@@ -19,7 +19,9 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/senseibelbi/O_QT_MCP"
+Homepage = "https://github.com/ToxMCP/toxmcp"
+Repository = "https://github.com/ToxMCP/oqt-mcp"
+Documentation = "https://github.com/ToxMCP/oqt-mcp#readme"
 
 [tool.poetry]
 package-mode = false
@@ -33,6 +35,7 @@ requests = "^2.31.0"
 black = "^24.4.2"
 isort = "^5.13.2"
 pytest-asyncio = "^0.23.0"
+jsonschema = "^4.24.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"

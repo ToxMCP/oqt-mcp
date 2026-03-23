@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ToxMCP/oqt-mcp/blob/main/schemas/oqtReadAcrossSummary.v1.json",
+  "title": "O-QT Read-Across Summary v1",
+  "description": "Portable O-QT grouping/read-across summary for downstream orchestration. This is a handoff object, not a final decision object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaName",
+    "schemaVersion",
+    "module",
+    "chemicalIdentity",
+    "groupingMethod",
+    "analogues",
+    "supportingProfiler",
+    "justification",
+    "provenance",
+    "limitations"
+  ],
+  "properties": {
+    "schemaName": {
+      "const": "oqtReadAcrossSummary"
+    },
+    "schemaVersion": {
+      "const": "v1"
+    },
+    "module": {
+      "const": "oqt-mcp"
+    },
+    "chemicalIdentity": {
+      "$ref": "#/$defs/chemicalIdentity"
+    },
+    "groupingMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "problemFormulation",
+        "decisionContext",
+        "acceptedUncertaintyLevel"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problemFormulation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decisionContext": {
+          "type": "string",
+          "minLength": 1
+        },
+        "routeOfExposure": {
+          "type": "string"
+        },
+        "acceptedUncertaintyLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        }
+      }
+    },
+    "analogues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/analogue"
+      }
+    },
+    "supportingProfiler": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/profilerFinding"
+      }
+    },
+    "justification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis",
+        "summary",
+        "residualUncertainty",
+        "acceptableForContext",
+        "endpointConclusions"
+      ],
+      "properties": {
+        "hypothesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "residualUncertainty": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "acceptableForContext": {
+          "type": "boolean"
+        },
+        "endpointConclusions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/endpointConclusion"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "chemicalIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputIdentifier", "preferredName", "chemId"],
+      "properties": {
+        "inputIdentifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preferredName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cas": {
+          "type": "string"
+        },
+        "smiles": {
+          "type": "string"
+        }
+      }
+    },
+    "analogue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identifier", "preferredName", "chemId", "rationale"],
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preferredName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "profilerFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profilerGuid", "status", "summary"],
+      "properties": {
+        "profilerGuid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial", "error", "not_run"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "endpointConclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "conclusion", "confidence", "residualUncertainty"],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conclusion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "residualUncertainty": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordId", "sourceSystem", "generatedBy", "generatedAt"],
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceSystem": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ToxMCP/oqt-mcp/blob/main/schemas/oqtHazardEvidenceSummary.v1.json",
+  "title": "O-QT Hazard Evidence Summary v1",
+  "description": "Portable O-QT hazard evidence summary for downstream orchestration. This is a handoff object, not a final decision object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaName",
+    "schemaVersion",
+    "module",
+    "chemicalIdentity",
+    "profilers",
+    "metabolismFindings",
+    "qsarFindings",
+    "applicabilityNotes",
+    "provenance",
+    "limitations"
+  ],
+  "properties": {
+    "schemaName": {
+      "const": "oqtHazardEvidenceSummary"
+    },
+    "schemaVersion": {
+      "const": "v1"
+    },
+    "module": {
+      "const": "oqt-mcp"
+    },
+    "chemicalIdentity": {
+      "$ref": "#/$defs/chemicalIdentity"
+    },
+    "profilers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/profilerFinding"
+      }
+    },
+    "metabolismFindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/metabolismFinding"
+      }
+    },
+    "qsarFindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/qsarFinding"
+      }
+    },
+    "applicabilityNotes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "context": {
+      "type": ["string", "null"]
+    }
+  },
+  "$defs": {
+    "chemicalIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputIdentifier", "preferredName", "chemId"],
+      "properties": {
+        "inputIdentifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preferredName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cas": {
+          "type": "string"
+        },
+        "smiles": {
+          "type": "string"
+        }
+      }
+    },
+    "profilerFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profilerGuid", "status", "summary"],
+      "properties": {
+        "profilerGuid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial", "error", "not_run"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint": {
+          "type": "string"
+        }
+      }
+    },
+    "metabolismFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["simulatorGuid", "status", "summary"],
+      "properties": {
+        "simulatorGuid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial", "error", "not_run"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "qsarFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qsarGuid", "status", "predictionSummary", "domainSummary"],
+      "properties": {
+        "qsarGuid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial", "error", "not_run"]
+        },
+        "predictionSummary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domainSummary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflowId", "sourceSystem", "generatedBy", "generatedAt"],
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceSystem": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    }
+  }
+}

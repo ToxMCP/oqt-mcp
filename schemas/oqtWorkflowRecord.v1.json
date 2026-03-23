@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ToxMCP/oqt-mcp/blob/main/schemas/oqtWorkflowRecord.v1.json",
+  "title": "O-QT Workflow Record v1",
+  "description": "Portable record for a single O-QT workflow execution. This is a handoff object, not a final decision object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaName",
+    "schemaVersion",
+    "module",
+    "workflowId",
+    "inputIdentifier",
+    "searchType",
+    "toolchain",
+    "artifacts",
+    "executionMetadata",
+    "provenance"
+  ],
+  "properties": {
+    "schemaName": {
+      "const": "oqtWorkflowRecord"
+    },
+    "schemaVersion": {
+      "const": "v1"
+    },
+    "module": {
+      "const": "oqt-mcp"
+    },
+    "workflowId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputIdentifier": {
+      "$ref": "#/$defs/inputIdentifier"
+    },
+    "searchType": {
+      "type": "string",
+      "enum": ["auto", "name", "cas", "smiles"]
+    },
+    "context": {
+      "type": ["string", "null"]
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primaryEntrypoint", "helperTools", "toolboxCompatibility"],
+      "properties": {
+        "primaryEntrypoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "helperTools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "toolboxCompatibility": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["json", "markdown", "pdf"],
+      "properties": {
+        "json": {
+          "$ref": "#/$defs/artifact"
+        },
+        "markdown": {
+          "$ref": "#/$defs/artifact"
+        },
+        "pdf": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "executionMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "assistantEnabled",
+        "requestedProfilers",
+        "requestedSimulators",
+        "requestedQsarModels",
+        "toolboxCallCount",
+        "errors"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial", "not_found", "error"]
+        },
+        "assistantEnabled": {
+          "type": "boolean"
+        },
+        "requestedProfilers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedSimulators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedQsarModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "toolboxCallCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "inputIdentifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolvedName": {
+          "type": "string"
+        },
+        "chemId": {
+          "type": "string"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fieldName", "delivery", "mediaType", "description"],
+      "properties": {
+        "fieldName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delivery": {
+          "type": "string",
+          "enum": ["inline", "file", "url"]
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "encoding": {
+          "type": "string"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSystem", "generatedBy", "generatedAt", "repository"],
+      "properties": {
+        "sourceSystem": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "toolboxCompatibility": {
+          "type": "string"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    }
+  }
+}

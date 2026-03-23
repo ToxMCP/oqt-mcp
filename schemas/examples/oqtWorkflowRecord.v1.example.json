@@ -1,0 +1,72 @@
+{
+  "schemaName": "oqtWorkflowRecord",
+  "schemaVersion": "v1",
+  "module": "oqt-mcp",
+  "workflowId": "oqtwf-benzene-20260323-0001",
+  "inputIdentifier": {
+    "value": "Benzene",
+    "resolvedName": "Benzene",
+    "chemId": "019a0835-99ea-7828-a2a1-2821354f4753"
+  },
+  "searchType": "name",
+  "context": "Publication-grade hazard assessment",
+  "toolchain": {
+    "primaryEntrypoint": "run_oqt_multiagent_workflow",
+    "helperTools": [
+      "search_chemicals",
+      "run_profiler",
+      "run_metabolism_simulator",
+      "run_qsar_model"
+    ],
+    "toolboxCompatibility": "Targets OECD QSAR Toolbox WebAPI /api/v6 compatibility routes."
+  },
+  "artifacts": {
+    "json": {
+      "fieldName": "log_json",
+      "delivery": "inline",
+      "mediaType": "application/json",
+      "description": "Comprehensive workflow log bundle."
+    },
+    "markdown": {
+      "fieldName": "summary_markdown",
+      "delivery": "inline",
+      "mediaType": "text/markdown",
+      "description": "Human-readable workflow narrative."
+    },
+    "pdf": {
+      "fieldName": "pdf_report_base64",
+      "delivery": "inline",
+      "mediaType": "application/pdf",
+      "description": "Base64-encoded PDF report.",
+      "encoding": "base64"
+    }
+  },
+  "executionMetadata": {
+    "status": "ok",
+    "assistantEnabled": false,
+    "requestedProfilers": [
+      "a06271f5-944e-4892-b0ad-fa5f7217ec14"
+    ],
+    "requestedSimulators": [
+      "simulator-guid-1"
+    ],
+    "requestedQsarModels": [
+      "qsar-guid-1"
+    ],
+    "toolboxCallCount": 6,
+    "errors": []
+  },
+  "provenance": {
+    "sourceSystem": "OECD QSAR Toolbox WebAPI",
+    "generatedBy": "O-QT MCP Server v0.2.0",
+    "generatedAt": "2026-03-23T09:30:00Z",
+    "repository": "https://github.com/ToxMCP/oqt-mcp",
+    "toolboxCompatibility": "v6 compatibility routes enabled",
+    "references": [
+      "https://github.com/ToxMCP/toxmcp"
+    ]
+  },
+  "notes": [
+    "Workflow record prepared for downstream orchestration."
+  ]
+}

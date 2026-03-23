@@ -81,6 +81,28 @@ codex tools call oqt-mcp run_profiler --profiler-guid a06271f5-944e-4892-b0ad-fa
 
 If the tool returns binary payloads (PDF), Codex CLI stores them in the outputs directory (displayed in the command response).
 
+### Contract Replay From Stored Logs
+
+If you store the `log_json` payload from a prior run, you can reconstruct the portable handoff contracts later without rerunning the OECD QSAR Toolbox workflow:
+
+```bash
+# 1. Capture a workflow response
+codex tools call oqt-mcp run_oqt_multiagent_workflow \
+  --identifier "Benzene" \
+  --search-type name \
+  > oqt-workflow-response.json
+
+# 2. Extract the stored O-QT log bundle
+jq '.log_json' oqt-workflow-response.json > oqt-workflow-log.json
+
+# 3. Rebuild schema-aligned handoffs from the stored log
+codex tools call oqt-mcp build_portable_handoffs_from_log \
+  --log @oqt-workflow-log.json \
+  | jq '.portable_handoffs | keys'
+```
+
+That replay path is useful for any downstream agent or orchestrator that wants to persist raw O-QT workflow evidence, then materialize `oqtWorkflowRecord.v1`, `oqtHazardEvidenceSummary.v1`, or `oqtReadAcrossSummary.v1` later in a different processing step.
+
 ## Gemini CLI (Workspace agents)
 
 1. Update Gemini’s MCP providers configuration (normally `~/.config/gemini/mcp.json`):
@@ -122,6 +144,7 @@ If the assistant integration is enabled on the server, `log_json.assistant_sessi
 4. Execute granular tools (`run_qsar_model`, `run_profiler`, `run_metabolism_simulator`) to confirm GUID-based operations succeed.
 5. Trigger the full workflow (`run_oqt_multiagent_workflow`) with a simple identifier and verify the JSON response plus generated PDF.
    - When the assistant path is active, check `result.assistant.enabled` and `result.log_json.assistant_session` to confirm the multi-agent prompts executed successfully.
+6. Persist `result.log_json` from one run, then call `build_portable_handoffs_from_log` and confirm the expected `portable_handoffs` keys are returned without a Toolbox rerun.
 
 ## Frequently Asked Questions
 

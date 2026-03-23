@@ -2,10 +2,20 @@ import asyncio
 import base64
 import io
 import json
+from pathlib import Path
 
 import pytest
+import jsonschema
 
 from src.tools.implementations import toolbox_execution as execution
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_schema(name: str) -> dict:
+    with (ROOT / "schemas" / name).open("r", encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def test_run_qsar_model(monkeypatch):
@@ -61,6 +71,130 @@ def test_render_pdf_from_log(monkeypatch):
     assert result["size_bytes"] == len(b"%PDF-1.4\n")
     decoded = base64.b64decode(result["pdf_base64"])
     assert decoded == b"%PDF-1.4\n"
+
+
+def test_build_portable_handoffs_from_workflow_log():
+    log = {
+        "identifier": "Benzene",
+        "inputs": {
+            "identifier": "Benzene",
+            "search_type": "name",
+            "context": "Publication-grade hazard assessment",
+            "profiler_guids": ["prof-1"],
+            "simulator_guids": ["sim-1"],
+            "qsar_guids": ["qsar-1"],
+        },
+        "selected_chemical": {
+            "ChemId": "chem-1",
+            "Cas": "71-43-2",
+            "Names": ["Benzene"],
+            "Smiles": "c1ccccc1",
+        },
+        "profiler_results": [{"profiler_guid": "prof-1", "result": {"call": "ok"}}],
+        "simulator_results": [{"simulator_guid": "sim-1", "result": [{"id": "m1"}]}],
+        "qsar_results": [
+            {
+                "qsar_guid": "qsar-1",
+                "prediction": {"value": 1.23},
+                "domain": {"status": "in_domain"},
+            }
+        ],
+        "errors": [],
+    }
+
+    result = asyncio.run(execution.build_portable_handoffs_from_log(log))
+
+    assert result["workflow_type"] == "workflow"
+    jsonschema.validate(
+        result["portable_handoffs"]["oqtWorkflowRecord.v1"],
+        _load_schema("oqtWorkflowRecord.v1.json"),
+    )
+    jsonschema.validate(
+        result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"],
+        _load_schema("oqtHazardEvidenceSummary.v1.json"),
+    )
+
+
+def test_build_portable_handoffs_from_grouping_log():
+    log = {
+        "identifier": "Benzene",
+        "inputs": {
+            "identifier": "Benzene",
+            "search_type": "name",
+            "context": "Exploratory grouping dossier",
+            "problem_formulation": "Assess exploratory repeated-dose toxicity read-across.",
+            "decision_context": "hazard_identification",
+            "route_of_exposure": "oral",
+            "accepted_uncertainty_level": "medium",
+            "profiler_guids": ["prof-1"],
+            "simulator_guids": [],
+            "qsar_guids": [],
+        },
+        "target_resolution": {"status": "resolved"},
+        "profiler_results": [
+            {
+                "subject_role": "target",
+                "subject_name": "Benzene",
+                "chem_id": "chem-target",
+                "profiler_guid": "prof-1",
+                "result": {"call": "ok"},
+            }
+        ],
+        "errors": [],
+        "grouping_justification": {
+            "report_context": {
+                "identifier": "Benzene",
+                "search_type": "name",
+                "problem_formulation": "Assess exploratory repeated-dose toxicity read-across.",
+                "decision_context": "hazard_identification",
+                "grouping_hypothesis": "Simple aromatic hydrocarbons are expected to share relevant structural and mechanistic features.",
+                "endpoints": ["Repeated dose toxicity"],
+                "route_of_exposure": "oral",
+                "accepted_uncertainty_level": "medium",
+                "context": "Exploratory grouping dossier",
+            },
+            "target_substance": {
+                "input_identifier": "Benzene",
+                "preferred_name": "Benzene",
+                "chem_id": "chem-target",
+                "cas": "71-43-2",
+                "smiles": "c1ccccc1",
+            },
+            "source_analogues": [
+                {
+                    "input_identifier": "Toluene",
+                    "preferred_name": "Toluene",
+                    "chem_id": "chem-source-1",
+                }
+            ],
+            "excluded_analogues": [],
+            "uncertainty_assessment": {
+                "overall_level": "medium",
+                "acceptable_for_context": True,
+            },
+            "endpoint_justifications": [
+                {
+                    "endpoint": "Repeated dose toxicity",
+                    "conclusion": "Provisional analogue justification assembled for repeated dose toxicity.",
+                    "confidence": "medium",
+                    "residual_uncertainty": "medium",
+                }
+            ],
+            "recommended_follow_ups": [],
+        },
+    }
+
+    result = asyncio.run(execution.build_portable_handoffs_from_log(log))
+
+    assert result["workflow_type"] == "grouping"
+    jsonschema.validate(
+        result["portable_handoffs"]["oqtWorkflowRecord.v1"],
+        _load_schema("oqtWorkflowRecord.v1.json"),
+    )
+    jsonschema.validate(
+        result["portable_handoffs"]["oqtReadAcrossSummary.v1"],
+        _load_schema("oqtReadAcrossSummary.v1.json"),
+    )
 
 
 def test_run_profiler(monkeypatch):

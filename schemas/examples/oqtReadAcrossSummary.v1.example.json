@@ -1,0 +1,66 @@
+{
+  "schemaName": "oqtReadAcrossSummary",
+  "schemaVersion": "v1",
+  "module": "oqt-mcp",
+  "chemicalIdentity": {
+    "inputIdentifier": "Benzene",
+    "preferredName": "Benzene",
+    "chemId": "019a0835-99ea-7828-a2a1-2821354f4753",
+    "cas": "71-43-2"
+  },
+  "groupingMethod": {
+    "type": "analogue_read_across",
+    "problemFormulation": "Assess whether simple aromatic hydrocarbon analogues can support exploratory repeated-dose toxicity read-across.",
+    "decisionContext": "hazard_identification",
+    "routeOfExposure": "oral",
+    "acceptedUncertaintyLevel": "medium"
+  },
+  "analogues": [
+    {
+      "identifier": "Toluene",
+      "preferredName": "Toluene",
+      "chemId": "analogue-chemid-1",
+      "rationale": "Simple aromatic hydrocarbon analogue with related structural and physicochemical features."
+    },
+    {
+      "identifier": "Ethylbenzene",
+      "preferredName": "Ethylbenzene",
+      "chemId": "analogue-chemid-2",
+      "rationale": "Resolved analogue supporting the aromatic hydrocarbon category hypothesis."
+    }
+  ],
+  "supportingProfiler": [
+    {
+      "profilerGuid": "a06271f5-944e-4892-b0ad-fa5f7217ec14",
+      "status": "ok",
+      "summary": "Profiler evidence supports a common reactivity/mechanistic framing across the analogue set."
+    }
+  ],
+  "justification": {
+    "hypothesis": "Target and source substances are simple aromatic hydrocarbons expected to share relevant structural and mechanistic features.",
+    "summary": "Exploratory read-across dossier assembled with structural, physicochemical, and profiler support.",
+    "residualUncertainty": "medium",
+    "acceptableForContext": true,
+    "endpointConclusions": [
+      {
+        "endpoint": "Repeated dose toxicity",
+        "conclusion": "Provisional analogue justification assembled for repeated dose toxicity.",
+        "confidence": "medium",
+        "residualUncertainty": "medium"
+      }
+    ]
+  },
+  "provenance": {
+    "recordId": "oqtra-benzene-20260323-0001",
+    "sourceSystem": "OECD QSAR Toolbox WebAPI",
+    "generatedBy": "O-QT MCP Server v0.2.0",
+    "generatedAt": "2026-03-23T09:45:00Z",
+    "references": [
+      "https://github.com/ToxMCP/oqt-mcp"
+    ]
+  },
+  "limitations": [
+    "Residual uncertainty remains context-dependent.",
+    "This object packages O-QT evidence only and is not a final suite-level conclusion."
+  ]
+}
