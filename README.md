@@ -117,12 +117,12 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 
 | Capability | Description |
 | --- | --- |
-| **Primary workflow engine** | Calls the OECD QSAR Toolbox WebAPI to run searches, profilers, metabolism simulators, curated QSAR models, and the flagship `run_oqt_multiagent_workflow` entrypoint. |
-| **Grouping/read-across support** | Builds OECD-style grouping dossiers through `build_grouping_justification` with structured similarity and uncertainty reporting. |
-| **Portable handoff contracts** | Publishes stable cross-suite handoff schemas for downstream orchestrators and other contract consumers, including evidence blocks, applicability-domain review, and attachment manifests. |
-| **Regulatory-ready reporting** | Generates a comprehensive PDF (ReportLab), Markdown narrative, and JSON provenance bundle. |
-| **Enterprise security** | OAuth2/OIDC token validation, RBAC per tool, audit logging, and Docker hardening. |
-| **Agent friendly** | Tested with Claude Code, Codex CLI, and Gemini CLI (see [integration guide](docs/integration_guides/mcp_integration.md)). |
+| 🔬 **Primary workflow engine** | Calls the OECD QSAR Toolbox WebAPI to run searches, profilers, metabolism simulators, curated QSAR models, and the flagship `run_oqt_multiagent_workflow` entrypoint. |
+| 🧩 **Grouping/read-across support** | Builds OECD-style grouping dossiers through `build_grouping_justification` with structured similarity and uncertainty reporting. |
+| 📦 **Portable handoff contracts** | Publishes stable cross-suite handoff schemas for downstream orchestrators and other contract consumers, including evidence blocks, applicability-domain review, and attachment manifests. |
+| 🧾 **Regulatory-ready reporting** | Generates a comprehensive PDF (ReportLab), Markdown narrative, and JSON provenance bundle. |
+| 🛡️ **Enterprise security** | OAuth2/OIDC token validation, RBAC per tool, audit logging, and Docker hardening. |
+| 🤖 **Agent friendly** | Tested with Claude Code, Codex CLI, and Gemini CLI (see [integration guide](docs/integration_guides/mcp_integration.md)). |
 
 ---
 
