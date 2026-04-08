@@ -13,36 +13,372 @@
     {
       "profilerGuid": "a06271f5-944e-4892-b0ad-fa5f7217ec14",
       "status": "ok",
-      "summary": "Profiler classified the substance under baseline narcosis-related behavior.",
-      "endpoint": "Acute aquatic toxicity"
+      "summary": "Collected 1 profiler result (Acute aquatic toxicity classification by Verhaar (Modified); OECD). Class 5 (Not possible to classify according to these rules).",
+      "source": {
+        "title": "Acute aquatic toxicity classification by Verhaar (Modified)",
+        "owner": "OECD",
+        "authors": "HENK J.M. Verhaar , CEES J. van Leeuwen & Joop L.M. Hermens",
+        "additionalInfo": {
+          "Version": "3.2"
+        }
+      }
     }
   ],
   "metabolismFindings": [
     {
-      "simulatorGuid": "simulator-guid-1",
+      "simulatorGuid": "981641a6-bd66-4566-8a4e-11403fe786a6",
       "status": "ok",
-      "summary": "Metabolism simulation returned a non-empty metabolite set for the target substance."
+      "summary": "Collected 1 simulator result (Autoxidation simulator; Laboratory of Mathematical Chemistry (LMC), Bourgas, Bulgaria). Metabolism simulation returned a non-empty metabolite set for the target substance.",
+      "metaboliteCount": 3,
+      "source": {
+        "title": "Autoxidation simulator",
+        "owner": "Laboratory of Mathematical Chemistry (LMC), Bourgas, Bulgaria",
+        "sourceUrl": "http://www.oasis-lmc.org/",
+        "additionalInfo": {
+          "Version": "3.8"
+        }
+      }
     }
   ],
   "qsarFindings": [
     {
-      "qsarGuid": "qsar-guid-1",
+      "qsarGuid": "aaea1ad1-a0db-1fb2-290a-6b5f52f049b2",
       "status": "ok",
-      "predictionSummary": "QSAR prediction completed successfully for the selected endpoint.",
-      "domainSummary": "Applicability domain check reported in-domain coverage."
+      "predictionSummary": "ECOSAR: EARTHWORM 14 d LC50 Mortality; United States Environmental Protection Agency (EPA), USA. Qsar prediction for LC50 with a reported value of 172.17831779243454 mg/L.",
+      "domainSummary": "Applicability domain check reported InDomain coverage.",
+      "endpoint": "LC50",
+      "predictedValue": "172.17831779243454",
+      "unit": "mg/L",
+      "domainStatus": "InDomain",
+      "source": {
+        "title": "ECOSAR: EARTHWORM 14 d LC50 Mortality",
+        "owner": "United States Environmental Protection Agency (EPA), USA",
+        "sourceUrl": "http://www.epa.gov/oppt/newchems/tools/21ecosar.htm",
+        "additionalInfo": {
+          "Version": "1.11"
+        }
+      }
     }
   ],
+  "endpointSummaries": [
+    {
+      "endpoint": "Gene mutation",
+      "rigidPath": "Human Health Hazards#Genetic Toxicity",
+      "recordCount": 1,
+      "summaryLevel": "detail",
+      "evidenceBasis": "experimental_data",
+      "keyFindings": [
+        "Overall result: Negative"
+      ],
+      "studyRecords": [
+        {
+          "recordId": "1758",
+          "endpoint": "Gene mutation",
+          "rigidPath": "Human Health Hazards#Genetic Toxicity",
+          "dataType": "Measured value.",
+          "value": "Negative",
+          "study": "Bacterial Reverse Mutation Assay (e.g. Ames Test)",
+          "citation": "CCRIS database,Toxnet databases",
+          "author": "Romualdo Benigni",
+          "year": "02.5.2011",
+          "testType": "Bacterial Reverse Mutation Assay (e.g. Ames Test)",
+          "methodType": "in Vitro",
+          "testOrganism": "Salmonella Typhimurium",
+          "strain": "TA 100",
+          "metabolicActivation": "With S9",
+          "overallResult": "Negative",
+          "referenceSource": "CCRIS database,Toxnet databases",
+          "database": "Bacterial mutagenicity ISSSTY",
+          "metadata": {
+            "Year": "02.5.2011",
+            "Author": "Romualdo Benigni",
+            "Strain": "TA 100",
+            "OVERALL": "Negative",
+            "Endpoint": "Gene mutation",
+            "Record ID": "1758",
+            "Test type": "Bacterial Reverse Mutation Assay (e.g. Ames Test)",
+            "Type of method": "in Vitro"
+          }
+        }
+      ]
+    }
+  ],
+  "evidenceBlocks": {
+    "endpointData": {
+      "summary": "Normalized 1 endpoint study record(s) into 1 endpoint summary block(s).",
+      "status": "present",
+      "basis": "Direct Toolbox endpoint payloads and study metadata were normalized into endpoint summaries.",
+      "keyEvidence": [
+        "Overall result: Negative"
+      ],
+      "references": [
+        {
+          "kind": "study_record",
+          "label": "Bacterial Reverse Mutation Assay (e.g. Ames Test)",
+          "citation": "CCRIS database,Toxnet databases",
+          "study": "Bacterial Reverse Mutation Assay (e.g. Ames Test)",
+          "recordId": "1758",
+          "endpoint": "Gene mutation",
+          "authors": "Romualdo Benigni",
+          "owner": "CCRIS database,Toxnet databases"
+        }
+      ],
+      "provenanceRecords": [
+        {
+          "source": "OECD QSAR Toolbox WebAPI:data/endpoint",
+          "field": "endpointSummaries",
+          "transformation": "Normalized endpoint payloads and MetaData into endpoint study records and endpoint summaries.",
+          "confidence": "high"
+        },
+        {
+          "source": "Bacterial Reverse Mutation Assay (e.g. Ames Test)",
+          "field": "endpointSummaries",
+          "transformation": "Normalized endpoint payloads and MetaData into endpoint study records and endpoint summaries.",
+          "confidence": "high"
+        }
+      ]
+    },
+    "profiling": {
+      "summary": "Structured profiler evidence was retrieved for 1 requested profiler(s).",
+      "status": "present",
+      "basis": "Toolbox profiling outputs were summarized for alert-oriented evidence and expert review.",
+      "keyEvidence": [
+        "Collected 1 profiler result (Acute aquatic toxicity classification by Verhaar (Modified); OECD). Class 5 (Not possible to classify according to these rules)."
+      ],
+      "references": [
+        {
+          "kind": "profiler",
+          "label": "Acute aquatic toxicity classification by Verhaar (Modified)",
+          "referenceId": "a06271f5-944e-4892-b0ad-fa5f7217ec14",
+          "authors": "HENK J.M. Verhaar , CEES J. van Leeuwen & Joop L.M. Hermens",
+          "owner": "OECD"
+        }
+      ],
+      "provenanceRecords": [
+        {
+          "source": "OECD QSAR Toolbox WebAPI:profiling/all",
+          "field": "profilers",
+          "transformation": "Normalized profiling outputs into portable profiler evidence summaries.",
+          "confidence": "high"
+        },
+        {
+          "source": "Acute aquatic toxicity classification by Verhaar (Modified)",
+          "field": "profilers",
+          "transformation": "Normalized profiling outputs into portable profiler evidence summaries.",
+          "confidence": "high"
+        }
+      ]
+    },
+    "metabolism": {
+      "summary": "Metabolism simulation outputs were retrieved for 1 simulator run(s).",
+      "status": "present",
+      "basis": "Toolbox simulator outputs were summarized to capture metabolite-generation context.",
+      "keyEvidence": [
+        "Collected 1 simulator result (Autoxidation simulator; Laboratory of Mathematical Chemistry (LMC), Bourgas, Bulgaria). Metabolism simulation returned a non-empty metabolite set for the target substance."
+      ],
+      "references": [
+        {
+          "kind": "simulator",
+          "label": "Autoxidation simulator",
+          "sourceUrl": "http://www.oasis-lmc.org/",
+          "referenceId": "981641a6-bd66-4566-8a4e-11403fe786a6",
+          "owner": "Laboratory of Mathematical Chemistry (LMC), Bourgas, Bulgaria"
+        }
+      ],
+      "provenanceRecords": [
+        {
+          "source": "OECD QSAR Toolbox WebAPI:metabolism/simulate",
+          "field": "metabolismFindings",
+          "transformation": "Normalized simulator outputs into portable metabolism findings.",
+          "confidence": "high"
+        },
+        {
+          "source": "Autoxidation simulator",
+          "field": "metabolismFindings",
+          "transformation": "Normalized simulator outputs into portable metabolism findings.",
+          "confidence": "high"
+        }
+      ]
+    },
+    "qsar": {
+      "summary": "QSAR predictions were retrieved for 1 model run(s), including applicability-domain context.",
+      "status": "present",
+      "basis": "Toolbox QSAR outputs and domain checks were normalized into portable QSAR findings.",
+      "keyEvidence": [
+        "ECOSAR: EARTHWORM 14 d LC50 Mortality; United States Environmental Protection Agency (EPA), USA. Qsar prediction for LC50 with a reported value of 172.17831779243454 mg/L.",
+        "Applicability domain check reported InDomain coverage."
+      ],
+      "references": [
+        {
+          "kind": "qsar_model",
+          "label": "ECOSAR: EARTHWORM 14 d LC50 Mortality",
+          "sourceUrl": "http://www.epa.gov/oppt/newchems/tools/21ecosar.htm",
+          "referenceId": "aaea1ad1-a0db-1fb2-290a-6b5f52f049b2",
+          "endpoint": "LC50",
+          "owner": "United States Environmental Protection Agency (EPA), USA"
+        }
+      ],
+      "provenanceRecords": [
+        {
+          "source": "OECD QSAR Toolbox WebAPI:qsar/apply",
+          "field": "qsarFindings",
+          "transformation": "Normalized QSAR predictions and domain checks into portable QSAR findings and applicability-domain summaries.",
+          "confidence": "high"
+        },
+        {
+          "source": "ECOSAR: EARTHWORM 14 d LC50 Mortality",
+          "field": "qsarFindings",
+          "transformation": "Normalized QSAR predictions and domain checks into portable QSAR findings and applicability-domain summaries.",
+          "confidence": "high"
+        }
+      ]
+    }
+  },
+  "requestMetadata": {
+    "requestedAt": "2026-04-08T10:30:00Z",
+    "requestedEndpoints": [
+      "Mutagenicity"
+    ],
+    "requestedProfilers": [
+      "a06271f5-944e-4892-b0ad-fa5f7217ec14"
+    ],
+    "requestedSimulators": [
+      "981641a6-bd66-4566-8a4e-11403fe786a6"
+    ],
+    "requestedQsarModels": [
+      "aaea1ad1-a0db-1fb2-290a-6b5f52f049b2"
+    ],
+    "summaryOnly": false
+  },
+  "assessmentBoundary": {
+    "scope": "module_scoped_toolbox_evidence_packaging",
+    "includes": [
+      "OECD QSAR Toolbox endpoint-study normalization and evidence packaging.",
+      "Module-local profiler, metabolism, and QSAR evidence normalization when requested.",
+      "Module-local applicability-domain review for Toolbox QSAR outputs."
+    ],
+    "excludes": [
+      "Cross-module synthesis with non-O-QT evidence sources.",
+      "Final hazard classification, labeling, or regulatory decision text.",
+      "Exposure, PBPK, or risk-characterization judgments."
+    ]
+  },
+  "decisionBoundary": {
+    "supportedDecisions": [
+      "Use as typed hazard evidence input for downstream review.",
+      "Use to audit which Toolbox evidence and provenance records were packaged."
+    ],
+    "prohibitedDecisions": [
+      "Do not treat as a final hazard classification or regulatory conclusion.",
+      "Do not treat qualitative uncertainty as a probabilistic confidence estimate."
+    ],
+    "reviewRequired": true
+  },
+  "decisionOwner": "downstream_expert_review",
+  "supports": {
+    "typedStudyEvidence": true,
+    "typedProfilerEvidence": true,
+    "typedApplicabilityDomainReview": true,
+    "crossModuleSynthesis": false,
+    "finalDecisionRecommendation": false
+  },
+  "requiredExternalInputs": [
+    "Downstream cross-module evidence synthesis and expert review.",
+    "Final hazard interpretation or classification policy.",
+    "Exposure or internal-dose context when the decision requires it."
+  ],
+  "uncertaintyAssessment": {
+    "method": "qualitative_evidence_completeness",
+    "supportsQuantitativeMetrics": false,
+    "overallLevel": "medium",
+    "coverage": {
+      "endpointData": "present",
+      "profiling": "present",
+      "metabolism": "present",
+      "qsar": "present"
+    },
+    "semanticCoverage": {
+      "overallQuantificationStatus": "qualitative_only",
+      "probabilisticConfidenceStatus": "not_supported",
+      "typedStudyRecordStatus": "present",
+      "typedApplicabilityDomainStatus": "present",
+      "qualitativeComponents": [
+        "endpoint_data",
+        "profiling",
+        "metabolism",
+        "qsar",
+        "applicability_domain"
+      ],
+      "quantifiedComponents": []
+    },
+    "dataGaps": [
+      "This assessment does not provide a probabilistic confidence estimate."
+    ],
+    "confidenceDrivers": [
+      "Endpoint study records were retrieved from the Toolbox.",
+      "Profiling evidence was retrieved for the selected chemical.",
+      "Metabolism simulation results were retrieved.",
+      "QSAR predictions and applicability-domain outputs were retrieved."
+    ],
+    "notes": [
+      "This uncertainty block characterizes evidence completeness and applicability-domain support, not a probabilistic confidence estimate."
+    ]
+  },
+  "applicabilityDomain": {
+    "overallStatus": "in_domain",
+    "supportsQuantitativeConfidence": false,
+    "confidenceLevel": "high",
+    "modelAssessments": [
+      {
+        "qsarGuid": "aaea1ad1-a0db-1fb2-290a-6b5f52f049b2",
+        "endpoint": "LC50",
+        "status": "in_domain",
+        "summary": "Applicability domain check reported InDomain coverage.",
+        "domainStatusRaw": "InDomain",
+        "source": {
+          "title": "ECOSAR: EARTHWORM 14 d LC50 Mortality",
+          "owner": "United States Environmental Protection Agency (EPA), USA",
+          "sourceUrl": "http://www.epa.gov/oppt/newchems/tools/21ecosar.htm",
+          "additionalInfo": {
+            "Version": "1.11"
+          }
+        }
+      }
+    ],
+    "notes": [
+      "Applicability-domain status reflects Toolbox model-domain outputs only; it is not a probabilistic confidence score."
+    ]
+  },
   "applicabilityNotes": [
     "Current WebAPI client targets /api/v6 compatibility routes.",
     "Interpretation should remain within O-QT's module scope and be combined with other suite evidence upstream."
   ],
   "provenance": {
-    "workflowId": "oqtwf-benzene-20260323-0001",
+    "workflowId": "oqthzd-benzene-20260408-0001",
     "sourceSystem": "OECD QSAR Toolbox WebAPI",
     "generatedBy": "O-QT MCP Server v0.2.0",
-    "generatedAt": "2026-03-23T09:30:00Z",
+    "generatedAt": "2026-04-08T10:30:00Z",
     "references": [
       "https://github.com/ToxMCP/oqt-mcp"
+    ],
+    "sourceTools": [
+      "search/auto",
+      "data/endpoints",
+      "data/endpoint",
+      "profiling/all",
+      "profiling/execute",
+      "metabolism/simulate",
+      "qsar/apply"
+    ],
+    "sources": [
+      {
+        "name": "data/endpoint",
+        "endpoint": "data/endpoint",
+        "statusCode": 200,
+        "durationMs": 1200.0,
+        "attempts": 1,
+        "reference": "019a0835-99ea-7828-a2a1-2821354f4753"
+      }
     ]
   },
   "limitations": [

@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
+from importlib import metadata
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,11 @@ import src.tools.implementations.workflow_runner
 from src.mcp.router import router as mcp_router
 
 log = logging.getLogger(__name__)
+
+try:
+    _app_version = metadata.version("o-qt-mcp-server")
+except metadata.PackageNotFoundError:
+    _app_version = "0.2.0"
 
 
 @asynccontextmanager
@@ -54,7 +60,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="O-QT MCP Server",
     description="Model Context Protocol Server for the OECD QSAR Toolbox. Built for security and interoperability.",
-    version="0.1.0",
+    version=_app_version,
     lifespan=lifespan,
 )
 

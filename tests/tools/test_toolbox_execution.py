@@ -25,20 +25,34 @@ def test_run_qsar_model(monkeypatch):
     async def fake_domain(qsar_guid, chem_id):
         return "In Domain"
 
+    async def fake_model_metadata(qsar_guid):
+        return {"Guid": qsar_guid, "Name": "Acute tox model", "Donator": "EPA"}
+
     monkeypatch.setattr(execution.qsar_client, "apply_qsar_model", fake_apply)
     monkeypatch.setattr(execution.qsar_client, "get_qsar_domain", fake_domain)
+    monkeypatch.setattr(
+        execution.qsar_client, "get_model_metadata", fake_model_metadata
+    )
 
     result = asyncio.run(execution.run_qsar_model("model", "chem"))
     assert result["prediction"]["Value"] == 1.23
     assert result["domain"] == "In Domain"
+    assert result["model_provenance"]["title"] == "Acute tox model"
+    assert result["model_provenance"]["owner"] == "EPA"
 
 
 def test_run_metabolism_simulator(monkeypatch):
     async def fake_sim(simulator_guid, chem_id):
         return ["metabolite"]
 
+    async def fake_simulator_info(simulator_guid):
+        return {"Guid": simulator_guid, "Caption": "Rat liver", "Donator": "OECD"}
+
     monkeypatch.setattr(
         execution.qsar_client, "simulate_metabolites_for_chem", fake_sim
+    )
+    monkeypatch.setattr(
+        execution.qsar_client, "get_simulator_info", fake_simulator_info
     )
 
     params = execution.SimulatorExecuteParams(
@@ -50,6 +64,8 @@ def test_run_metabolism_simulator(monkeypatch):
         )
     )
     assert result["result"] == ["metabolite"]
+    assert result["simulator_provenance"]["title"] == "Rat liver"
+    assert result["simulator_provenance"]["owner"] == "OECD"
 
 
 def test_canonicalize_structure(monkeypatch):
@@ -95,8 +111,13 @@ def test_build_portable_handoffs_from_workflow_log():
         "qsar_results": [
             {
                 "qsar_guid": "qsar-1",
-                "prediction": {"value": 1.23},
-                "domain": {"status": "in_domain"},
+                "prediction": {
+                    "Value": "1.23",
+                    "Unit": "mg/L",
+                    "Endpoint": "LC50",
+                    "DomainResult": "InDomain"
+                },
+                "domain": "InDomain",
             }
         ],
         "errors": [],
@@ -105,14 +126,21 @@ def test_build_portable_handoffs_from_workflow_log():
     result = asyncio.run(execution.build_portable_handoffs_from_log(log))
 
     assert result["workflow_type"] == "workflow"
+    workflow_record = result["portable_handoffs"]["oqtWorkflowRecord.v1"]
     jsonschema.validate(
-        result["portable_handoffs"]["oqtWorkflowRecord.v1"],
+        workflow_record,
         _load_schema("oqtWorkflowRecord.v1.json"),
     )
     jsonschema.validate(
         result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"],
         _load_schema("oqtHazardEvidenceSummary.v1.json"),
     )
+    assert workflow_record["packageSemantics"]["mode"] == "working_bundle"
+    assert workflow_record["attachments"]
+    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["requestMetadata"]["requestedQsarModels"] == ["qsar-1"]
+    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["endpointSummaries"][0]["endpoint"] == "LC50"
+    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["decisionOwner"] == "downstream_expert_review"
+    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["uncertaintyAssessment"]["semanticCoverage"]["overallQuantificationStatus"] == "qualitative_only"
 
 
 def test_build_portable_handoffs_from_grouping_log():
@@ -187,32 +215,47 @@ def test_build_portable_handoffs_from_grouping_log():
     result = asyncio.run(execution.build_portable_handoffs_from_log(log))
 
     assert result["workflow_type"] == "grouping"
+    read_across = result["portable_handoffs"]["oqtReadAcrossSummary.v1"]
     jsonschema.validate(
         result["portable_handoffs"]["oqtWorkflowRecord.v1"],
         _load_schema("oqtWorkflowRecord.v1.json"),
     )
     jsonschema.validate(
-        result["portable_handoffs"]["oqtReadAcrossSummary.v1"],
+        read_across,
         _load_schema("oqtReadAcrossSummary.v1.json"),
     )
+    assert read_across["dataMatrix"]["rowCount"] == 0
+    assert read_across["uncertaintyTable"]["overallLevel"] == "medium"
+    assert read_across["decisionOwner"] == "downstream_expert_review"
+    assert read_across["supports"]["typedGroupingDossier"] is True
 
 
 def test_run_profiler(monkeypatch):
     async def fake_profile(prof_guid, chem_id, simulator_guid=None):
         return {"result": "ok", "sim": simulator_guid}
 
+    async def fake_profiler_info(prof_guid):
+        return {"Guid": prof_guid, "_name": "Acute profiler", "_donator": "OECD"}
+
     monkeypatch.setattr(execution.qsar_client, "profile_with_profiler", fake_profile)
+    monkeypatch.setattr(execution.qsar_client, "get_profiler_info", fake_profiler_info)
 
     result = asyncio.run(execution.run_profiler("prof", "chem"))
     assert result["profiler_guid"] == "prof"
     assert result["result"]["result"] == "ok"
+    assert result["profiler_provenance"]["title"] == "Acute profiler"
+    assert result["profiler_provenance"]["owner"] == "OECD"
 
 
 def test_run_profiler_with_simulator(monkeypatch):
     async def fake_profile(prof_guid, chem_id, simulator_guid=None):
         return {"sim": simulator_guid}
 
+    async def fake_profiler_info(prof_guid):
+        return {"Guid": prof_guid, "_name": "Acute profiler", "_donator": "OECD"}
+
     monkeypatch.setattr(execution.qsar_client, "profile_with_profiler", fake_profile)
+    monkeypatch.setattr(execution.qsar_client, "get_profiler_info", fake_profiler_info)
 
     result = asyncio.run(execution.run_profiler("prof", "chem", "sim"))
     assert result["simulator_guid"] == "sim"
@@ -223,10 +266,16 @@ def test_run_metabolism_simulator_with_smiles(monkeypatch):
     async def fake_sim(simulator_guid, smiles):
         return ["metabolite"]
 
+    async def fake_simulator_info(simulator_guid):
+        return {"Guid": simulator_guid, "Caption": "Rat liver", "Donator": "OECD"}
+
     monkeypatch.setattr(
         execution.qsar_client,
         "simulate_metabolites_for_smiles",
         fake_sim,
+    )
+    monkeypatch.setattr(
+        execution.qsar_client, "get_simulator_info", fake_simulator_info
     )
 
     params = execution.SimulatorExecuteParams(
@@ -238,29 +287,49 @@ def test_run_metabolism_simulator_with_smiles(monkeypatch):
         )
     )
     assert result["smiles"] == "CCO"
+    assert result["simulator_provenance"]["title"] == "Rat liver"
 
 
 def test_download_qmrf(monkeypatch):
     async def fake_qmrf(qsar_guid):
-        return "QMRF"
+        return {"report": "qmrf"}
+
+    async def fake_model_metadata(qsar_guid):
+        return {"Guid": qsar_guid, "Name": "Acute tox model", "Donator": "EPA"}
 
     monkeypatch.setattr(execution.qsar_client, "generate_qmrf", fake_qmrf)
+    monkeypatch.setattr(
+        execution.qsar_client, "get_model_metadata", fake_model_metadata
+    )
 
     result = asyncio.run(execution.download_qmrf("model", "chem"))
-    assert result["qmrf"] == "QMRF"
+    decoded = base64.b64decode(result["qmrf_base64"]).decode("utf-8")
+    payload = json.loads(decoded)
+    assert payload["report"] == "qmrf"
+    assert result["size_bytes"] > 0
+    assert result["content_type"] == "application/octet-stream"
+    assert result["model_provenance"]["title"] == "Acute tox model"
 
 
 def test_download_qsar_report(monkeypatch):
     async def fake_report(chem_id, qsar_guid, comments):
         return {"report": True, "comments": comments}
 
+    async def fake_model_metadata(qsar_guid):
+        return {"Guid": qsar_guid, "Name": "Acute tox model", "Donator": "EPA"}
+
     monkeypatch.setattr(execution.qsar_client, "generate_qsar_report", fake_report)
+    monkeypatch.setattr(
+        execution.qsar_client, "get_model_metadata", fake_model_metadata
+    )
 
     result = asyncio.run(execution.download_qsar_report("chem", "model", "note"))
     decoded = base64.b64decode(result["report_base64"]).decode("utf-8")
     payload = json.loads(decoded)
     assert payload["comments"] == "note"
     assert result["size_bytes"] > 0
+    assert result["content_type"] == "application/octet-stream"
+    assert result["model_provenance"]["title"] == "Acute tox model"
 
 
 def test_execute_workflow(monkeypatch):
@@ -290,10 +359,15 @@ def test_group_chemicals(monkeypatch):
     async def fake_group(chem_id, profiler_guid):
         return ["chemA", "chemB"]
 
+    async def fake_profiler_info(prof_guid):
+        return {"Guid": prof_guid, "_name": "Grouping profiler", "_donator": "OECD"}
+
     monkeypatch.setattr(execution.qsar_client, "group_by_profiler", fake_group)
+    monkeypatch.setattr(execution.qsar_client, "get_profiler_info", fake_profiler_info)
 
     result = asyncio.run(execution.group_chemicals("chem", "prof"))
     assert result["group"] == ["chemA", "chemB"]
+    assert result["profiler_provenance"]["title"] == "Grouping profiler"
 
 
 def test_structure_connectivity(monkeypatch):

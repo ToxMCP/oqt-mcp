@@ -43,7 +43,7 @@ SERVER_CAPABILITIES = {
 try:
     _server_version = metadata.version("o-qt-mcp-server")
 except metadata.PackageNotFoundError:
-    _server_version = "0.1.0"
+    _server_version = "0.2.0"
 
 SERVER_INFO = ServerInfo(name="O-QT MCP Server", version=_server_version)
 

@@ -13,6 +13,16 @@
     "profilers",
     "metabolismFindings",
     "qsarFindings",
+    "endpointSummaries",
+    "evidenceBlocks",
+    "requestMetadata",
+    "assessmentBoundary",
+    "decisionBoundary",
+    "decisionOwner",
+    "supports",
+    "requiredExternalInputs",
+    "uncertaintyAssessment",
+    "applicabilityDomain",
     "applicabilityNotes",
     "provenance",
     "limitations"
@@ -47,6 +57,43 @@
       "items": {
         "$ref": "#/$defs/qsarFinding"
       }
+    },
+    "endpointSummaries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/endpointSummary"
+      }
+    },
+    "evidenceBlocks": {
+      "$ref": "#/$defs/evidenceBlocks"
+    },
+    "requestMetadata": {
+      "$ref": "#/$defs/requestMetadata"
+    },
+    "assessmentBoundary": {
+      "$ref": "#/$defs/assessmentBoundary"
+    },
+    "decisionBoundary": {
+      "$ref": "#/$defs/decisionBoundary"
+    },
+    "decisionOwner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supports": {
+      "$ref": "#/$defs/supports"
+    },
+    "requiredExternalInputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "uncertaintyAssessment": {
+      "$ref": "#/$defs/uncertaintyAssessment"
+    },
+    "applicabilityDomain": {
+      "$ref": "#/$defs/applicabilityDomain"
     },
     "applicabilityNotes": {
       "type": "array",
@@ -93,6 +140,52 @@
         }
       }
     },
+    "sourceAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "guid": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "study": {
+          "type": "string"
+        },
+        "disclaimer": {
+          "type": "string"
+        },
+        "helpFile": {
+          "type": "string"
+        },
+        "position": {
+          "type": "string"
+        },
+        "additionalInfo": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
     "profilerFinding": {
       "type": "object",
       "additionalProperties": false,
@@ -112,6 +205,9 @@
         },
         "endpoint": {
           "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/sourceAttribution"
         }
       }
     },
@@ -131,6 +227,13 @@
         "summary": {
           "type": "string",
           "minLength": 1
+        },
+        "metaboliteCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/sourceAttribution"
         }
       }
     },
@@ -154,6 +257,600 @@
         "domainSummary": {
           "type": "string",
           "minLength": 1
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "predictedValue": {
+          "type": ["number", "string", "null"]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "domainStatus": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/sourceAttribution"
+        }
+      }
+    },
+    "endpointStudyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recordId": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "rigidPath": {
+          "type": "string"
+        },
+        "dataType": {
+          "type": "string"
+        },
+        "value": {
+          "type": ["number", "string", "null"]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "qualifier": {
+          "type": "string"
+        },
+        "study": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "year": {
+          "type": "string"
+        },
+        "testType": {
+          "type": "string"
+        },
+        "methodType": {
+          "type": "string"
+        },
+        "testOrganism": {
+          "type": "string"
+        },
+        "strain": {
+          "type": "string"
+        },
+        "metabolicActivation": {
+          "type": "string"
+        },
+        "overallResult": {
+          "type": "string"
+        },
+        "referenceSource": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "endpointSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "recordCount",
+        "summaryLevel",
+        "evidenceBasis",
+        "keyFindings",
+        "studyRecords"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "rigidPath": {
+          "type": "string"
+        },
+        "recordCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "summaryLevel": {
+          "type": "string",
+          "enum": ["none", "summary", "detail"]
+        },
+        "evidenceBasis": {
+          "type": "string",
+          "enum": [
+            "experimental_data",
+            "qsar_prediction",
+            "profiler_alert",
+            "metabolism_context",
+            "mixed"
+          ]
+        },
+        "keyFindings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "studyRecords": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/endpointStudyRecord"
+          }
+        }
+      }
+    },
+    "referenceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "label"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "study_record",
+            "endpoint_summary",
+            "profiler",
+            "profiling_catalog",
+            "simulator",
+            "qsar_model"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "study": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "recordId": {
+          "type": "string"
+        },
+        "referenceId": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        }
+      }
+    },
+    "provenanceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "field", "transformation", "confidence"],
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "transformation": {
+          "type": ["string", "null"]
+        },
+        "confidence": {
+          "type": ["string", "null"],
+          "enum": ["low", "medium", "high", null]
+        }
+      }
+    },
+    "evidenceBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "status",
+        "basis",
+        "keyEvidence",
+        "references",
+        "provenanceRecords"
+      ],
+      "properties": {
+        "summary": {
+          "type": ["string", "null"]
+        },
+        "status": {
+          "$ref": "#/$defs/coverageState"
+        },
+        "basis": {
+          "type": "string"
+        },
+        "keyEvidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/referenceRecord"
+          }
+        },
+        "provenanceRecords": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenanceRecord"
+          }
+        }
+      }
+    },
+    "evidenceBlocks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpointData", "profiling", "metabolism", "qsar"],
+      "properties": {
+        "endpointData": {
+          "$ref": "#/$defs/evidenceBlock"
+        },
+        "profiling": {
+          "$ref": "#/$defs/evidenceBlock"
+        },
+        "metabolism": {
+          "$ref": "#/$defs/evidenceBlock"
+        },
+        "qsar": {
+          "$ref": "#/$defs/evidenceBlock"
+        }
+      }
+    },
+    "requestMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestedAt",
+        "requestedEndpoints",
+        "requestedProfilers",
+        "requestedSimulators",
+        "requestedQsarModels",
+        "summaryOnly"
+      ],
+      "properties": {
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "requestedEndpoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedProfilers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedSimulators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedQsarModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summaryOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "assessmentBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "includes", "excludes"],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decisionBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supportedDecisions", "prohibitedDecisions", "reviewRequired"],
+      "properties": {
+        "supportedDecisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "prohibitedDecisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewRequired": {
+          "type": "boolean"
+        }
+      }
+    },
+    "supports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typedStudyEvidence",
+        "typedProfilerEvidence",
+        "typedApplicabilityDomainReview",
+        "crossModuleSynthesis",
+        "finalDecisionRecommendation"
+      ],
+      "properties": {
+        "typedStudyEvidence": {
+          "type": "boolean"
+        },
+        "typedProfilerEvidence": {
+          "type": "boolean"
+        },
+        "typedApplicabilityDomainReview": {
+          "type": "boolean"
+        },
+        "crossModuleSynthesis": {
+          "type": "boolean"
+        },
+        "finalDecisionRecommendation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "coverageState": {
+      "type": "string",
+      "enum": ["none", "partial", "present"]
+    },
+    "uncertaintyCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpointData", "profiling", "metabolism", "qsar"],
+      "properties": {
+        "endpointData": {
+          "$ref": "#/$defs/coverageState"
+        },
+        "profiling": {
+          "$ref": "#/$defs/coverageState"
+        },
+        "metabolism": {
+          "$ref": "#/$defs/coverageState"
+        },
+        "qsar": {
+          "$ref": "#/$defs/coverageState"
+        }
+      }
+    },
+    "uncertaintyAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "supportsQuantitativeMetrics",
+        "overallLevel",
+        "coverage",
+        "semanticCoverage",
+        "dataGaps",
+        "confidenceDrivers",
+        "notes"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "supportsQuantitativeMetrics": {
+          "type": "boolean"
+        },
+        "overallLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "coverage": {
+          "$ref": "#/$defs/uncertaintyCoverage"
+        },
+        "semanticCoverage": {
+          "$ref": "#/$defs/semanticCoverage"
+        },
+        "dataGaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidenceDrivers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "semanticCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overallQuantificationStatus",
+        "probabilisticConfidenceStatus",
+        "typedStudyRecordStatus",
+        "typedApplicabilityDomainStatus",
+        "qualitativeComponents",
+        "quantifiedComponents"
+      ],
+      "properties": {
+        "overallQuantificationStatus": {
+          "type": "string",
+          "enum": ["qualitative_only"]
+        },
+        "probabilisticConfidenceStatus": {
+          "type": "string",
+          "enum": ["not_supported"]
+        },
+        "typedStudyRecordStatus": {
+          "type": "string",
+          "enum": ["present", "none"]
+        },
+        "typedApplicabilityDomainStatus": {
+          "type": "string",
+          "enum": ["present", "not_applicable"]
+        },
+        "qualitativeComponents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quantifiedComponents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "applicabilityAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "summary"],
+      "properties": {
+        "qsarGuid": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "in_domain",
+            "out_of_domain",
+            "mixed",
+            "not_assessed",
+            "not_applicable"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "domainStatusRaw": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/sourceAttribution"
+        }
+      }
+    },
+    "applicabilityDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overallStatus",
+        "supportsQuantitativeConfidence",
+        "confidenceLevel",
+        "modelAssessments",
+        "notes"
+      ],
+      "properties": {
+        "overallStatus": {
+          "type": "string",
+          "enum": [
+            "in_domain",
+            "out_of_domain",
+            "mixed",
+            "not_assessed",
+            "not_applicable"
+          ]
+        },
+        "supportsQuantitativeConfidence": {
+          "type": "boolean"
+        },
+        "confidenceLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "modelAssessments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/applicabilityAssessment"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "statusCode": {
+          "type": "integer"
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeoutProfile": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
         }
       }
     },
@@ -183,6 +880,18 @@
           "items": {
             "type": "string",
             "format": "uri"
+          }
+        },
+        "sourceTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRecord"
           }
         }
       }

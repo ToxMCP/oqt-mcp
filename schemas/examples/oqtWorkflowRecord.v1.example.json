@@ -10,6 +10,17 @@
   },
   "searchType": "name",
   "context": "Publication-grade hazard assessment",
+  "rootEntity": {
+    "entityType": "workflow_execution",
+    "entityId": "oqtwf-benzene-20260323-0001",
+    "label": "Benzene"
+  },
+  "packageSemantics": {
+    "mode": "working_bundle",
+    "isReadOnly": false,
+    "containsExternalReferences": true,
+    "purpose": "live_mcp_response"
+  },
   "toolchain": {
     "primaryEntrypoint": "run_oqt_multiagent_workflow",
     "helperTools": [
@@ -25,22 +36,69 @@
       "fieldName": "log_json",
       "delivery": "inline",
       "mediaType": "application/json",
-      "description": "Comprehensive workflow log bundle."
+      "description": "Comprehensive workflow log bundle.",
+      "source": "mcp-inline-field",
+      "sizeBytes": 1024,
+      "checksumSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "integrityNote": "SHA-256 computed over canonical JSON serialization."
     },
     "markdown": {
       "fieldName": "summary_markdown",
       "delivery": "inline",
       "mediaType": "text/markdown",
-      "description": "Human-readable workflow narrative."
+      "description": "Human-readable workflow narrative.",
+      "source": "mcp-inline-field",
+      "sizeBytes": 384,
+      "checksumSha256": "2222222222222222222222222222222222222222222222222222222222222222"
     },
     "pdf": {
       "fieldName": "pdf_report_base64",
       "delivery": "inline",
       "mediaType": "application/pdf",
       "description": "Base64-encoded PDF report.",
-      "encoding": "base64"
+      "encoding": "base64",
+      "source": "mcp-inline-field",
+      "sizeBytes": 4096,
+      "checksumSha256": "3333333333333333333333333333333333333333333333333333333333333333"
     }
   },
+  "attachments": [
+    {
+      "name": "workflow-execution-log.json",
+      "role": "structured_log",
+      "fieldName": "log_json",
+      "delivery": "inline",
+      "mediaType": "application/json",
+      "description": "Comprehensive workflow log bundle.",
+      "source": "mcp-inline-field",
+      "sizeBytes": 1024,
+      "checksumSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "integrityNote": "SHA-256 computed over canonical JSON serialization."
+    },
+    {
+      "name": "workflow-execution-summary.md",
+      "role": "narrative_summary",
+      "fieldName": "summary_markdown",
+      "delivery": "inline",
+      "mediaType": "text/markdown",
+      "description": "Human-readable workflow narrative.",
+      "source": "mcp-inline-field",
+      "sizeBytes": 384,
+      "checksumSha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "name": "workflow-execution-report.pdf",
+      "role": "audit_report",
+      "fieldName": "pdf_report_base64",
+      "delivery": "inline",
+      "mediaType": "application/pdf",
+      "description": "Base64-encoded PDF report.",
+      "encoding": "base64",
+      "source": "mcp-inline-field",
+      "sizeBytes": 4096,
+      "checksumSha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
   "executionMetadata": {
     "status": "ok",
     "assistantEnabled": false,
@@ -54,6 +112,7 @@
       "qsar-guid-1"
     ],
     "toolboxCallCount": 6,
+    "toolboxTotalDurationMs": 49.0,
     "errors": []
   },
   "provenance": {
@@ -64,6 +123,22 @@
     "toolboxCompatibility": "v6 compatibility routes enabled",
     "references": [
       "https://github.com/ToxMCP/toxmcp"
+    ],
+    "sourceTools": [
+      "workflow/search",
+      "profiling/execute",
+      "metabolism/simulate",
+      "qsar/apply"
+    ],
+    "sources": [
+      {
+        "name": "workflow/search",
+        "endpoint": "workflow/search",
+        "statusCode": 200,
+        "durationMs": 12.0,
+        "attempts": 1,
+        "reference": "Benzene"
+      }
     ]
   },
   "notes": [

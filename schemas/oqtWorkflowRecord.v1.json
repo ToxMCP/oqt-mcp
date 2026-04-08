@@ -12,8 +12,11 @@
     "workflowId",
     "inputIdentifier",
     "searchType",
+    "rootEntity",
+    "packageSemantics",
     "toolchain",
     "artifacts",
+    "attachments",
     "executionMetadata",
     "provenance"
   ],
@@ -40,6 +43,12 @@
     },
     "context": {
       "type": ["string", "null"]
+    },
+    "rootEntity": {
+      "$ref": "#/$defs/rootEntity"
+    },
+    "packageSemantics": {
+      "$ref": "#/$defs/packageSemantics"
     },
     "toolchain": {
       "type": "object",
@@ -77,6 +86,12 @@
         "pdf": {
           "$ref": "#/$defs/artifact"
         }
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attachment"
       }
     },
     "executionMetadata": {
@@ -121,6 +136,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "toolboxTotalDurationMs": {
+          "type": "number",
+          "minimum": 0
+        },
         "errors": {
           "type": "array",
           "items": {
@@ -157,6 +176,44 @@
         }
       }
     },
+    "rootEntity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entityType", "entityId"],
+      "properties": {
+        "entityType": {
+          "type": "string",
+          "enum": ["workflow_execution", "grouping_dossier"]
+        },
+        "entityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "packageSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "isReadOnly", "containsExternalReferences"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["working_bundle", "packaged_dossier"]
+        },
+        "isReadOnly": {
+          "type": "boolean"
+        },
+        "containsExternalReferences": {
+          "type": "boolean"
+        },
+        "purpose": {
+          "type": "string"
+        }
+      }
+    },
     "artifact": {
       "type": "object",
       "additionalProperties": false,
@@ -179,6 +236,98 @@
           "minLength": 1
         },
         "encoding": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checksumSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "integrityNote": {
+          "type": "string"
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "fieldName", "delivery", "mediaType", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": ["structured_log", "narrative_summary", "audit_report"]
+        },
+        "fieldName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delivery": {
+          "type": "string",
+          "enum": ["inline", "file", "url"]
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checksumSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "integrityNote": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "statusCode": {
+          "type": "integer"
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeoutProfile": {
+          "type": "string"
+        },
+        "reference": {
           "type": "string"
         }
       }
@@ -212,6 +361,18 @@
           "items": {
             "type": "string",
             "format": "uri"
+          }
+        },
+        "sourceTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRecord"
           }
         }
       }

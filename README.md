@@ -63,6 +63,8 @@ The current implementation follows a layered model:
 - Final suite-level evidence synthesis, BER/WoE logic, and cross-module decisions belong above O-QT in a downstream orchestrator.
 
 See [docs/architecture.md](docs/architecture.md) for the fuller boundary and contract notes.
+See [docs/oecd_alignment_review_2025.md](docs/oecd_alignment_review_2025.md) for the OECD 2025 grouping/IUCLID gap analysis and the next contract-focused improvements.
+See [docs/cross_suite_alignment_2026.md](docs/cross_suite_alignment_2026.md) for the local AOP/CompTox contract patterns adopted into O-QT.
 
 ## What's New In v0.2.0
 
@@ -71,6 +73,7 @@ This is a maturity and contract release, not a redesign.
 - Re-aligned repository identity, package metadata, and release notes around `ToxMCP/oqt-mcp`.
 - Clarified the public surface as a primary workflow engine plus secondary expert tools.
 - Published portable O-QT handoff schemas for hazard evidence, read-across support, and workflow provenance.
+- Hardened the hazard handoff with explicit evidence blocks, applicability-domain review, and richer provenance records for audit-grade downstream review.
 - Added explicit downstream-orchestration documentation and examples for contract consumers.
 - Documented the current synchronous deployment model instead of implying an async platform that does not exist yet.
 
@@ -116,7 +119,7 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 | --- | --- |
 | **Primary workflow engine** | Calls the OECD QSAR Toolbox WebAPI to run searches, profilers, metabolism simulators, curated QSAR models, and the flagship `run_oqt_multiagent_workflow` entrypoint. |
 | **Grouping/read-across support** | Builds OECD-style grouping dossiers through `build_grouping_justification` with structured similarity and uncertainty reporting. |
-| **Portable handoff contracts** | Publishes stable cross-suite handoff schemas for downstream orchestrators and other contract consumers. |
+| **Portable handoff contracts** | Publishes stable cross-suite handoff schemas for downstream orchestrators and other contract consumers, including evidence blocks, applicability-domain review, and attachment manifests. |
 | **Regulatory-ready reporting** | Generates a comprehensive PDF (ReportLab), Markdown narrative, and JSON provenance bundle. |
 | **Enterprise security** | OAuth2/OIDC token validation, RBAC per tool, audit logging, and Docker hardening. |
 | **Agent friendly** | Tested with Claude Code, Codex CLI, and Gemini CLI (see [integration guide](docs/integration_guides/mcp_integration.md)). |
@@ -186,6 +189,15 @@ Once running, your MCP host connects to `http://localhost:8000/mcp`.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `QSAR_TOOLBOX_API_URL` | ✅ | `http://localhost:5000` | Base URL to the OECD QSAR Toolbox WebAPI. |
+| `QSAR_LIGHT_TIMEOUT_SECONDS` | Optional | `30` | Per-request timeout for lightweight Toolbox calls. |
+| `QSAR_HEAVY_TIMEOUT_SECONDS` | Optional | `300` | Per-request timeout for expensive Toolbox calls such as reports, workflows, and some simulations. |
+| `QSAR_LIGHT_MAX_ATTEMPTS` | Optional | `2` | Retry count for lightweight Toolbox calls. |
+| `QSAR_HEAVY_MAX_ATTEMPTS` | Optional | `3` | Retry count for expensive Toolbox calls. |
+| `QSAR_HEAVY_CONCURRENCY` | Optional | `3` | Concurrency cap for heavy Toolbox calls issued by the MCP. |
+| `QSAR_HAZARD_PROFILING_WALLCLOCK_TIMEOUT_SECONDS` | Optional | `25` | Wall-clock cap for the profiling sweep inside `analyze_chemical_hazard`; returns explicit partial evidence if exceeded. |
+| `QSAR_DISCOVERY_LIST_ALL_TOTAL_WALLCLOCK_TIMEOUT_SECONDS` | Optional | `45` | Total wall-clock budget for `list_all_qsar_models`. |
+| `QSAR_DISCOVERY_LIST_ALL_PER_POSITION_TIMEOUT_SECONDS` | Optional | `6` | Per-endpoint-tree-position timeout while enumerating the QSAR model catalog. |
+| `QSAR_DISCOVERY_SEARCH_DATABASES_WALLCLOCK_TIMEOUT_SECONDS` | Optional | `20` | Wall-clock cap for `list_search_databases`; fails fast on timeout. |
 | `AUTH_OIDC_ISSUER` | ✅ (prod) | – | OIDC issuer URL (Auth0, Keycloak, etc.). |
 | `AUTH_OIDC_AUDIENCE` | ✅ (prod) | – | Expected audience in access tokens. |
 | `AUTH_OIDC_ALGORITHMS` | ✅ (prod) | `["RS256"]` | Allowed JWT algorithms. |
@@ -199,6 +211,8 @@ Once running, your MCP host connects to `http://localhost:8000/mcp`.
 | `ASSISTANT_API_KEY` | Optional | – | API key for the selected provider. Falls back to `OPENAI_API_KEY` / `OPENROUTER_API_KEY` if absent. |
 
 Compatibility note: the current client targets Toolbox WebAPI `/api/v6` routes. Newer Toolbox builds are supported as long as they keep the v6 compatibility layer enabled.
+
+Operational note: on slower Toolbox hosts, prefer tuning the wall-clock safeguards above rather than only increasing retry counts. The MCP is designed to return explicit partial evidence or timeout errors, not to block indefinitely on discovery-heavy endpoints.
 
 See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and bypass mode safety.
 
@@ -228,8 +242,8 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `get_endpoint_tree` | Returns the endpoint taxonomy used to organise profilers and models. |
 | `get_metadata_hierarchy` | Returns the metadata hierarchy useful for filtering experimental data. |
 | `list_qsar_models` | Lists QSAR models for a specific endpoint tree position. |
-| `list_all_qsar_models` | Enumerates the full QSAR catalog across the endpoint tree (deduplicated). |
-| `list_search_databases` | Enumerates searchable inventories in the QSAR Toolbox. |
+| `list_all_qsar_models` | Enumerates the full QSAR catalog across the endpoint tree (deduplicated). Returns partial catalog metadata and warnings if enumeration exceeds the configured wall-clock budget. |
+| `list_search_databases` | Enumerates searchable inventories in the QSAR Toolbox. Fails fast on timeout rather than waiting through the full heavy retry budget. |
 | `run_qsar_model` | Runs a specific QSAR model for a chemId and reports applicability domain status. |
 | `run_profiler` | Executes a profiler for a chemId (optionally providing a simulator). |
 | `run_metabolism_simulator` | Runs a metabolism simulator using either a chemId or SMILES. |
@@ -301,7 +315,25 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 - `build_grouping_justification` adds a `grouping_justification` object with target/analogue resolution, similarity assessment, endpoint conclusions, and uncertainty reporting.
 - `pdf_report_base64` – base64-encoded, publication-ready PDF.
 - `portable_handoffs` – schema-aligned handoff objects for downstream orchestration. `build_grouping_justification` returns `oqtWorkflowRecord.v1` plus `oqtReadAcrossSummary.v1`; `run_oqt_multiagent_workflow` returns `oqtWorkflowRecord.v1` plus `oqtHazardEvidenceSummary.v1`.
+- `oqtWorkflowRecord.v1` now declares `rootEntity`, `packageSemantics`, and an auditable `attachments` manifest with checksums when the inline payload is available.
+- `oqtHazardEvidenceSummary.v1` now carries request metadata, explicit assessment and decision boundaries, support claims, required external inputs, endpoint summaries, source attribution for model/profiler/simulator evidence, and a qualitative uncertainty block with `semanticCoverage` that explicitly states it is an evidence-completeness assessment rather than a probabilistic estimate.
+- `oqtReadAcrossSummary.v1` now promotes explicit assessment and decision boundaries, required external inputs, applicability-domain notes, the portable evidence matrix, and the aspect-level uncertainty table into the published handoff contract.
 - Portable downstream contracts are published separately under `schemas/`; see [schemas/README.md](schemas/README.md).
+
+### Metadata & provenance fields
+
+The MCP exposes normalized provenance wherever the Toolbox already returns ownership or study metadata:
+
+- `get_public_qsar_model_info`, `get_profiler_info`, `get_simulator_info`, and `get_calculator_info` include a top-level `provenance` block.
+- `list_qsar_models` and `list_all_qsar_models` attach a compact `provenance_summary` to each catalog record.
+- `run_qsar_prediction`, `run_qsar_model`, `download_qmrf`, and `download_qsar_report` include `model_provenance`.
+- `run_profiler` and `group_chemicals_by_profiler` include `profiler_provenance`.
+- `generate_metabolites` and `run_metabolism_simulator` include `simulator_provenance`.
+- `analyze_chemical_hazard` now normalizes endpoint study records, endpoint summaries, evidence blocks, applicability-domain review, provenance collections, and a portable `oqtHazardEvidenceSummary.v1` handoff alongside the raw Toolbox payloads. The helper is intentionally bounded: if `profiling/all` is too slow, it returns partial endpoint evidence with explicit uncertainty and warning fields instead of waiting indefinitely.
+- Hazard and read-across handoffs now publish machine-readable boundary fields (`assessmentBoundary`, `decisionBoundary`, `decisionOwner`) plus `supports` and `requiredExternalInputs`, so downstream systems can distinguish what O-QT packaged from what still requires expert review, regulatory policy, exposure context, or cross-module synthesis.
+- High-level workflow outputs preserve the same normalized metadata inside `log_json.profiler_results[*].profiler_provenance`, `log_json.simulator_results[*].simulator_provenance`, and `log_json.qsar_results[*].model_provenance`.
+- Report-style tools (`download_qmrf`, `download_qsar_report`, `download_workflow_report`) now also declare `content_type`; when the Toolbox returns a ZIP bundle rather than a bare PDF, the MCP response includes `archive_entries` and `pdf_report_base64` when a PDF member can be extracted.
+- High-level workflows and grouping dossiers accept direct Toolbox `chemId` values as `identifier` inputs, which lets orchestrators bypass flaky search endpoints once a substance has already been resolved.
 
 ---
 

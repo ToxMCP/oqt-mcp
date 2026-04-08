@@ -12,6 +12,14 @@
     "chemicalIdentity",
     "groupingMethod",
     "analogues",
+    "assessmentBoundary",
+    "decisionBoundary",
+    "decisionOwner",
+    "supports",
+    "requiredExternalInputs",
+    "applicabilityDomain",
+    "dataMatrix",
+    "uncertaintyTable",
     "supportingProfiler",
     "justification",
     "provenance",
@@ -66,6 +74,34 @@
       "items": {
         "$ref": "#/$defs/analogue"
       }
+    },
+    "assessmentBoundary": {
+      "$ref": "#/$defs/assessmentBoundary"
+    },
+    "decisionBoundary": {
+      "$ref": "#/$defs/decisionBoundary"
+    },
+    "decisionOwner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supports": {
+      "$ref": "#/$defs/supports"
+    },
+    "requiredExternalInputs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "applicabilityDomain": {
+      "$ref": "#/$defs/applicabilityDomain"
+    },
+    "dataMatrix": {
+      "$ref": "#/$defs/dataMatrix"
+    },
+    "uncertaintyTable": {
+      "$ref": "#/$defs/uncertaintyTable"
     },
     "supportingProfiler": {
       "type": "array",
@@ -166,6 +202,210 @@
         }
       }
     },
+    "assessmentBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "includes", "excludes"],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decisionBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supportedDecisions", "prohibitedDecisions", "reviewRequired"],
+      "properties": {
+        "supportedDecisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "prohibitedDecisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewRequired": {
+          "type": "boolean"
+        }
+      }
+    },
+    "supports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typedGroupingDossier",
+        "typedApplicabilityDomain",
+        "typedUncertaintyTable",
+        "finalReadAcrossAcceptance",
+        "finalDecisionRecommendation"
+      ],
+      "properties": {
+        "typedGroupingDossier": {
+          "type": "boolean"
+        },
+        "typedApplicabilityDomain": {
+          "type": "boolean"
+        },
+        "typedUncertaintyTable": {
+          "type": "boolean"
+        },
+        "finalReadAcrossAcceptance": {
+          "type": "boolean"
+        },
+        "finalDecisionRecommendation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "applicabilityDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inclusionCriteria",
+        "exclusionCriteria",
+        "allowedDifferences",
+        "boundaryNotes",
+        "supportingSimilarityContexts",
+        "subcategoryNotes"
+      ],
+      "properties": {
+        "inclusionCriteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclusionCriteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedDifferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "boundaryNotes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supportingSimilarityContexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "subcategoryNotes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dataMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rowCount", "rows"],
+      "properties": {
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dataMatrixRow"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dataMatrixRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subjectRole",
+        "subjectName",
+        "evidenceType",
+        "toolName",
+        "resultType",
+        "status",
+        "summary"
+      ],
+      "properties": {
+        "subjectRole": {
+          "type": "string",
+          "enum": ["target", "source_analogue", "category_member", "unknown"]
+        },
+        "subjectName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toolName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resultType": {
+          "type": "string",
+          "enum": [
+            "experimental",
+            "planned",
+            "qsar_prediction",
+            "profiler",
+            "metabolism_simulation",
+            "hts_hcs_omics",
+            "aop",
+            "other"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "partial", "error", "not_run"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        }
+      }
+    },
     "profilerFinding": {
       "type": "object",
       "additionalProperties": false,
@@ -182,6 +422,81 @@
         "summary": {
           "type": "string",
           "minLength": 1
+        },
+        "source": {
+          "$ref": "#/$defs/sourceAttribution"
+        }
+      }
+    },
+    "uncertaintyTable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptedLevel",
+        "overallLevel",
+        "acceptableForContext",
+        "decisionContextFit",
+        "whatIsNotAddressed",
+        "rows"
+      ],
+      "properties": {
+        "acceptedLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "overallLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "acceptableForContext": {
+          "type": "boolean"
+        },
+        "decisionContextFit": {
+          "type": "string"
+        },
+        "whatIsNotAddressed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uncertaintyRow"
+          }
+        },
+        "recommendedActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uncertaintyRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aspect", "dataQuality", "strengthOfEvidence", "uncertainty", "comments"],
+      "properties": {
+        "aspect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataQuality": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "strengthOfEvidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "uncertainty": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "comments": {
+          "type": "string"
         }
       }
     },
@@ -205,6 +520,82 @@
         "residualUncertainty": {
           "type": "string",
           "enum": ["low", "medium", "high"]
+        }
+      }
+    },
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "statusCode": {
+          "type": "integer"
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeoutProfile": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "guid": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "study": {
+          "type": "string"
+        },
+        "disclaimer": {
+          "type": "string"
+        },
+        "helpFile": {
+          "type": "string"
+        },
+        "position": {
+          "type": "string"
+        },
+        "additionalInfo": {
+          "type": "object",
+          "additionalProperties": true
         }
       }
     },
@@ -234,6 +625,18 @@
           "items": {
             "type": "string",
             "format": "uri"
+          }
+        },
+        "sourceTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceRecord"
           }
         }
       }

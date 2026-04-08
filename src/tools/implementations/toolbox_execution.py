@@ -1,13 +1,16 @@
 import base64
 import inspect
+import io
 import json
 import logging
+import zipfile
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
 from src.qsar import QsarClientError, qsar_client
 from src.tools.implementations import workflow_runner
+from src.tools.provenance import build_provenance
 from src.tools.registry import tool_registry
 from src.utils.pdf_generator import generate_pdf_report
 
@@ -26,6 +29,33 @@ def _ensure_bytes(payload: Optional[object]) -> bytes:
     if isinstance(payload, (dict, list)):
         return json.dumps(payload).encode("utf-8")
     raise TypeError("Unexpected binary payload type")
+
+
+def _describe_binary_artifact(payload: bytes) -> Dict[str, Any]:
+    description: Dict[str, Any] = {
+        "size_bytes": len(payload),
+        "content_type": "application/octet-stream",
+    }
+    if payload.startswith(b"%PDF"):
+        description["content_type"] = "application/pdf"
+        return description
+
+    buffer = io.BytesIO(payload)
+    if zipfile.is_zipfile(buffer):
+        description["content_type"] = "application/zip"
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            names = archive.namelist()
+            description["archive_entries"] = names
+            pdf_name = next(
+                (name for name in names if name.lower().endswith(".pdf")),
+                None,
+            )
+            if pdf_name:
+                description["pdf_report_base64"] = base64.b64encode(
+                    archive.read(pdf_name)
+                ).decode("utf-8")
+                description["primary_pdf_entry"] = pdf_name
+    return description
 
 
 def _format_meta(label: str, meta: Dict[str, Any]) -> Dict[str, Any]:
@@ -75,6 +105,41 @@ def _attach_toolbox(result: Dict[str, Any], meta: Dict[str, Any]) -> Dict[str, A
     if meta.get("calls"):
         result["toolbox"] = meta
     return result
+
+
+async def _fetch_model_provenance(model_id: str) -> tuple[dict | None, dict | None]:
+    try:
+        payload, meta = await _invoke_with_meta(qsar_client.get_model_metadata, model_id)
+    except QsarClientError as exc:
+        log.warning("QSAR model metadata lookup failed for %s: %s", model_id, exc)
+        return None, None
+    return build_provenance(payload), _format_meta("about/object", meta)
+
+
+async def _fetch_profiler_provenance(
+    profiler_guid: str,
+) -> tuple[dict | None, dict | None]:
+    try:
+        payload, meta = await _invoke_with_meta(qsar_client.get_profiler_info, profiler_guid)
+    except QsarClientError as exc:
+        log.warning("Profiler metadata lookup failed for %s: %s", profiler_guid, exc)
+        return None, None
+    return build_provenance(payload), _format_meta("profiling/info", meta)
+
+
+async def _fetch_simulator_provenance(
+    simulator_guid: str,
+) -> tuple[dict | None, dict | None]:
+    try:
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_simulator_info, simulator_guid
+        )
+    except QsarClientError as exc:
+        log.warning(
+            "Simulator metadata lookup failed for %s: %s", simulator_guid, exc
+        )
+        return None, None
+    return build_provenance(payload), _format_meta("metabolism/info", meta)
 
 
 class QsarApplyParams(BaseModel):
@@ -180,9 +245,11 @@ async def run_qsar_model(qsar_guid: str, chem_id: str) -> dict:
     except QsarClientError as exc:
         log.error("QSAR apply failed: %s", exc)
         raise
+    model_provenance, model_meta = await _fetch_model_provenance(qsar_guid)
     toolbox_meta = _aggregate_meta(
         _format_meta("qsar/apply", apply_meta),
         _format_meta("qsar/domain", domain_meta),
+        _format_meta("about/object", model_meta),
     )
     result = {
         "qsar_guid": qsar_guid,
@@ -190,6 +257,8 @@ async def run_qsar_model(qsar_guid: str, chem_id: str) -> dict:
         "prediction": prediction,
         "domain": domain,
     }
+    if model_provenance:
+        result["model_provenance"] = model_provenance
     return _attach_toolbox(result, toolbox_meta)
 
 
@@ -203,14 +272,20 @@ async def run_profiler(
     except QsarClientError as exc:
         log.error("Profiler execution failed: %s", exc)
         raise
+    profiler_provenance, profiler_info_meta = await _fetch_profiler_provenance(
+        profiler_guid
+    )
     result = {
         "profiler_guid": profiler_guid,
         "chem_id": chem_id,
         "simulator_guid": simulator_guid,
         "result": result,
     }
+    if profiler_provenance:
+        result["profiler_provenance"] = profiler_provenance
     toolbox_meta = _aggregate_meta(
         _format_meta("profiling/execute", meta),
+        _format_meta("profiling/info", profiler_info_meta),
     )
     return _attach_toolbox(result, toolbox_meta)
 
@@ -232,14 +307,20 @@ async def run_metabolism_simulator(
     except QsarClientError as exc:
         log.error("Metabolism simulator failed: %s", exc)
         raise
+    simulator_provenance, simulator_info_meta = await _fetch_simulator_provenance(
+        simulator_guid
+    )
     result = {
         "simulator_guid": simulator_guid,
         "chem_id": chem_id,
         "smiles": smiles,
         "result": result,
     }
+    if simulator_provenance:
+        result["simulator_provenance"] = simulator_provenance
     toolbox_meta = _aggregate_meta(
         _format_meta("metabolism/simulate", meta),
+        _format_meta("metabolism/info", simulator_info_meta),
     )
     return _attach_toolbox(result, toolbox_meta)
 
@@ -250,13 +331,20 @@ async def download_qmrf(qsar_guid: str, chem_id: str) -> dict:
     except QsarClientError as exc:
         log.error("QMRF retrieval failed: %s", exc)
         raise
+    model_provenance, model_meta = await _fetch_model_provenance(qsar_guid)
+    qmrf_bytes = _ensure_bytes(payload)
+    encoded = base64.b64encode(qmrf_bytes).decode("utf-8")
     result = {
         "qsar_guid": qsar_guid,
         "chem_id": chem_id,
-        "qmrf": payload,
+        "qmrf_base64": encoded,
+        **_describe_binary_artifact(qmrf_bytes),
     }
+    if model_provenance:
+        result["model_provenance"] = model_provenance
     toolbox_meta = _aggregate_meta(
         _format_meta("report/qmrf", meta),
+        _format_meta("about/object", model_meta),
     )
     return _attach_toolbox(result, toolbox_meta)
 
@@ -271,16 +359,20 @@ async def download_qsar_report(
     except QsarClientError as exc:
         log.error("QSAR report retrieval failed: %s", exc)
         raise
+    model_provenance, model_meta = await _fetch_model_provenance(qsar_guid)
     pdf_bytes = _ensure_bytes(payload)
     encoded = base64.b64encode(pdf_bytes).decode("utf-8")
     result = {
         "chem_id": chem_id,
         "qsar_guid": qsar_guid,
         "report_base64": encoded,
-        "size_bytes": len(pdf_bytes),
+        **_describe_binary_artifact(pdf_bytes),
     }
+    if model_provenance:
+        result["model_provenance"] = model_provenance
     toolbox_meta = _aggregate_meta(
         _format_meta("report/qsar", meta),
+        _format_meta("about/object", model_meta),
     )
     return _attach_toolbox(result, toolbox_meta)
 
@@ -320,7 +412,7 @@ async def download_workflow_report(
         "chem_id": chem_id,
         "workflow_guid": workflow_guid,
         "report_base64": encoded,
-        "size_bytes": len(pdf_bytes),
+        **_describe_binary_artifact(pdf_bytes),
     }
     toolbox_meta = _aggregate_meta(
         _format_meta("report/workflow", meta),
@@ -336,13 +428,19 @@ async def group_chemicals(chem_id: str, profiler_guid: str) -> dict:
     except QsarClientError as exc:
         log.warning("Grouping failed for %s/%s: %s", chem_id, profiler_guid, exc)
         raise
+    profiler_provenance, profiler_info_meta = await _fetch_profiler_provenance(
+        profiler_guid
+    )
     result = {
         "chem_id": chem_id,
         "profiler_guid": profiler_guid,
         "group": payload,
     }
+    if profiler_provenance:
+        result["profiler_provenance"] = profiler_provenance
     toolbox_meta = _aggregate_meta(
         _format_meta("grouping/profile", meta),
+        _format_meta("profiling/info", profiler_info_meta),
     )
     return _attach_toolbox(result, toolbox_meta)
 

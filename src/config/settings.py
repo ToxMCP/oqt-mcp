@@ -38,6 +38,15 @@ class QSARSettings(BaseSettings):
     QSAR_TOOLBOX_API_URL: str = os.getenv(
         "QSAR_TOOLBOX_API_URL", "http://localhost:5000"
     )  # Default if not set
+    QSAR_LIGHT_TIMEOUT_SECONDS: float = 30.0
+    QSAR_HEAVY_TIMEOUT_SECONDS: float = 300.0
+    QSAR_LIGHT_MAX_ATTEMPTS: int = 2
+    QSAR_HEAVY_MAX_ATTEMPTS: int = 3
+    QSAR_HEAVY_CONCURRENCY: int = 3
+    QSAR_HAZARD_PROFILING_WALLCLOCK_TIMEOUT_SECONDS: float = 25.0
+    QSAR_DISCOVERY_LIST_ALL_TOTAL_WALLCLOCK_TIMEOUT_SECONDS: float = 45.0
+    QSAR_DISCOVERY_LIST_ALL_PER_POSITION_TIMEOUT_SECONDS: float = 6.0
+    QSAR_DISCOVERY_SEARCH_DATABASES_WALLCLOCK_TIMEOUT_SECONDS: float = 20.0
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"

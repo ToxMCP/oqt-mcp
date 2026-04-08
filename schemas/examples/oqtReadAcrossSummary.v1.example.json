@@ -29,6 +29,124 @@
       "rationale": "Resolved analogue supporting the aromatic hydrocarbon category hypothesis."
     }
   ],
+  "assessmentBoundary": {
+    "scope": "module_scoped_grouping_dossier_packaging",
+    "includes": [
+      "OECD QSAR Toolbox grouping/read-across dossier packaging.",
+      "Module-local analogue normalization, applicability-domain packaging, and uncertainty-table export.",
+      "Portable evidence-matrix packaging for downstream audit and review."
+    ],
+    "excludes": [
+      "Final regulatory acceptance of read-across.",
+      "Cross-module synthesis with non-O-QT evidence sources.",
+      "Final hazard, exposure, or risk decisions."
+    ]
+  },
+  "decisionBoundary": {
+    "supportedDecisions": [
+      "Use as typed grouping or read-across evidence input for downstream review.",
+      "Use to audit analogue selection, evidence rows, and aspect-level uncertainty packaging."
+    ],
+    "prohibitedDecisions": [
+      "Do not treat as final regulatory acceptance of read-across.",
+      "Do not treat as a complete evidence-of-record without expert review."
+    ],
+    "reviewRequired": true
+  },
+  "decisionOwner": "downstream_expert_review",
+  "supports": {
+    "typedGroupingDossier": true,
+    "typedApplicabilityDomain": true,
+    "typedUncertaintyTable": true,
+    "finalReadAcrossAcceptance": false,
+    "finalDecisionRecommendation": false
+  },
+  "requiredExternalInputs": [
+    "Expert review of analogue suitability and endpoint relevance.",
+    "Endpoint-specific regulatory acceptance criteria.",
+    "Downstream evidence synthesis and final decision policy."
+  ],
+  "applicabilityDomain": {
+    "inclusionCriteria": [
+      "Grouping hypothesis: Target and source substances are simple aromatic hydrocarbons expected to share relevant structural and mechanistic features.",
+      "Target and source substances must resolve to Toolbox records with stable identifiers and enough comparison data to support analogue evaluation.",
+      "Assessment scope is limited to the requested endpoint set: Repeated dose toxicity.",
+      "Assessment scope is limited to the stated route of exposure: oral."
+    ],
+    "exclusionCriteria": [],
+    "allowedDifferences": [
+      "Differences are only acceptable when the stated grouping hypothesis remains plausible across the assessed similarity contexts and residual uncertainty stays within the accepted level."
+    ],
+    "boundaryNotes": [
+      "Assessed 2 target/source pair(s); 0 canonical SMILES exact match(es) and 0 connectivity exact match(es).",
+      "Compared 6 shared physicochemical descriptor(s) across 2 target/source pair(s)."
+    ],
+    "supportingSimilarityContexts": [
+      "structural_similarity",
+      "physicochemical_similarity",
+      "reactivity_profile_similarity",
+      "adme_tk_similarity",
+      "bioactivity_similarity",
+      "mechanistic_similarity",
+      "toxicological_profile_similarity"
+    ],
+    "subcategoryNotes": []
+  },
+  "dataMatrix": {
+    "rowCount": 2,
+    "rows": [
+      {
+        "subjectRole": "target",
+        "subjectName": "Benzene",
+        "evidenceType": "profiling",
+        "toolName": "run_profiler",
+        "resultType": "profiler",
+        "status": "ok",
+        "summary": "Profiler evidence supports a common reactivity/mechanistic framing across the analogue set.",
+        "reference": "a06271f5-944e-4892-b0ad-fa5f7217ec14"
+      },
+      {
+        "subjectRole": "source_analogue",
+        "subjectName": "Toluene",
+        "evidenceType": "qsar",
+        "toolName": "run_qsar_model",
+        "resultType": "qsar_prediction",
+        "status": "ok",
+        "summary": "Returned object with keys: value, confidence.",
+        "endpoint": "Repeated dose toxicity",
+        "reference": "qsar-guid-1"
+      }
+    ],
+    "notes": [
+      "Rows summarize the O-QT evidence matrix assembled for the grouping dossier."
+    ]
+  },
+  "uncertaintyTable": {
+    "acceptedLevel": "medium",
+    "overallLevel": "medium",
+    "acceptableForContext": true,
+    "decisionContextFit": "Residual uncertainty is acceptable for the stated decision context.",
+    "whatIsNotAddressed": [],
+    "rows": [
+      {
+        "aspect": "structural_similarity",
+        "dataQuality": "medium",
+        "strengthOfEvidence": "medium",
+        "uncertainty": "medium",
+        "comments": "Assessed 2 target/source pair(s); 0 canonical SMILES exact match(es) and 0 connectivity exact match(es)."
+      },
+      {
+        "aspect": "physicochemical_similarity",
+        "dataQuality": "medium",
+        "strengthOfEvidence": "medium",
+        "uncertainty": "medium",
+        "comments": "Compared 6 shared physicochemical descriptor(s) across 2 target/source pair(s)."
+      }
+    ],
+    "recommendedActions": [
+      "Add metabolism simulator evidence when ADME/TK or metabolite similarity is part of the grouping hypothesis."
+    ]
+  },
   "supportingProfiler": [
     {
       "profilerGuid": "a06271f5-944e-4892-b0ad-fa5f7217ec14",
@@ -38,7 +156,7 @@
   ],
   "justification": {
     "hypothesis": "Target and source substances are simple aromatic hydrocarbons expected to share relevant structural and mechanistic features.",
-    "summary": "Exploratory read-across dossier assembled with structural, physicochemical, and profiler support.",
+    "summary": "Exploratory read-across dossier assembled with structural, physicochemical, and profiler support; see uncertaintyTable for aspect-level scoring.",
     "residualUncertainty": "medium",
     "acceptableForContext": true,
     "endpointConclusions": [
@@ -57,6 +175,22 @@
     "generatedAt": "2026-03-23T09:45:00Z",
     "references": [
       "https://github.com/ToxMCP/oqt-mcp"
+    ],
+    "sourceTools": [
+      "target/search",
+      "structure/canonize",
+      "structure/connectivity",
+      "profiling/execute"
+    ],
+    "sources": [
+      {
+        "name": "target/search",
+        "endpoint": "target/search",
+        "statusCode": 200,
+        "durationMs": 12.0,
+        "attempts": 1,
+        "reference": "Benzene"
+      }
     ]
   },
   "limitations": [

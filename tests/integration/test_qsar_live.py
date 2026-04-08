@@ -8,6 +8,8 @@ from src.qsar.client import QsarClient, QsarClientError
 
 _FLAG = os.getenv("QSAR_LIVE_TESTS", "").lower()
 _ENABLED = _FLAG in {"1", "true", "yes", "on"}
+_SLOW_FLAG = os.getenv("QSAR_LIVE_SLOW_TESTS", "").lower()
+_SLOW_ENABLED = _SLOW_FLAG in {"1", "true", "yes", "on"}
 _BASE_URL = settings.qsar.QSAR_TOOLBOX_API_URL.rstrip("/")
 
 
@@ -52,6 +54,11 @@ def test_list_profilers_live():
     assert "Caption" in first
 
 
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _SLOW_ENABLED,
+    reason="Slow live Toolbox integration tests are disabled. Set QSAR_LIVE_SLOW_TESTS=1 to enable.",
+)
 def test_list_search_databases_live():
     client = _client()
     payload = _run(client.list_search_databases())

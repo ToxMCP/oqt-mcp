@@ -58,5 +58,6 @@ filterwarnings = [
     "ignore:datetime.datetime.utcnow\\(\\) is deprecated"
 ]
 markers = [
-    "integration: live QSAR Toolbox calls requiring QSAR_LIVE_TESTS=1"
+    "integration: live QSAR Toolbox calls requiring QSAR_LIVE_TESTS=1",
+    "slow: long-running live Toolbox execution/report paths requiring QSAR_LIVE_SLOW_TESTS=1"
 ]

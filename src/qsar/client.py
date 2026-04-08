@@ -217,9 +217,11 @@ class QsarClient:
             with_meta=with_meta,
         )
 
-    async def get_model_metadata(self, object_guid: str) -> Dict[str, Any]:
+    async def get_model_metadata(
+        self, object_guid: str, *, with_meta: bool = False
+    ) -> Any:
         encoded = quote(object_guid)
-        return await self._get(f"/api/v6/about/object/{encoded}")
+        return await self._get(f"/api/v6/about/object/{encoded}", with_meta=with_meta)
 
     async def list_calculators(self, *, with_meta: bool = False) -> Any:
         return await self._get("/api/v6/calculation", with_meta=with_meta)
@@ -470,7 +472,11 @@ class QsarClient:
         return catalog
 
     async def list_search_databases(self, *, with_meta: bool = False) -> Any:
-        return await self._get("/api/v6/search/databases", with_meta=with_meta)
+        return await self._get(
+            "/api/v6/search/databases",
+            timeout_profile="heavy",
+            with_meta=with_meta,
+        )
 
     async def canonicalize_structure(
         self, smiles: str, *, with_meta: bool = False
@@ -558,7 +564,11 @@ class QsarClient:
         encoded_chem = quote(chem_id)
         encoded_sim = quote(simulator_guid) if simulator_guid else NO_SIMULATOR_GUID
         path = f"/api/v6/profiling/{encoded_prof}/{encoded_chem}/{encoded_sim}"
-        return await self._get(path, with_meta=with_meta)
+        return await self._get(
+            path,
+            timeout_profile="heavy",
+            with_meta=with_meta,
+        )
 
     async def profile_all(self, chem_id: str) -> Any:
         encoded = quote(chem_id)
@@ -599,4 +609,26 @@ class QsarClient:
 # Global client instance using application settings
 from src.config.settings import settings  # noqa: E402 (import after class definition)
 
-qsar_client = QsarClient(settings.qsar.QSAR_TOOLBOX_API_URL)
+qsar_client = QsarClient(
+    settings.qsar.QSAR_TOOLBOX_API_URL,
+    timeout=settings.qsar.QSAR_LIGHT_TIMEOUT_SECONDS,
+    timeout_profiles={
+        "light": httpx.Timeout(
+            connect=5.0,
+            read=settings.qsar.QSAR_LIGHT_TIMEOUT_SECONDS,
+            write=settings.qsar.QSAR_LIGHT_TIMEOUT_SECONDS,
+            pool=10.0,
+        ),
+        "heavy": httpx.Timeout(
+            connect=10.0,
+            read=settings.qsar.QSAR_HEAVY_TIMEOUT_SECONDS,
+            write=max(60.0, settings.qsar.QSAR_HEAVY_TIMEOUT_SECONDS),
+            pool=15.0,
+        ),
+    },
+    max_attempts={
+        "light": settings.qsar.QSAR_LIGHT_MAX_ATTEMPTS,
+        "heavy": settings.qsar.QSAR_HEAVY_MAX_ATTEMPTS,
+    },
+    heavy_concurrency=settings.qsar.QSAR_HEAVY_CONCURRENCY,
+)
