@@ -3,7 +3,6 @@ from pathlib import Path
 
 import jsonschema
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -42,5 +41,7 @@ def test_portable_schema_identity_fields_are_stable():
         example = _load_json(example_path)
 
         assert example["schemaName"] == schema["properties"]["schemaName"]["const"]
-        assert example["schemaVersion"] == schema["properties"]["schemaVersion"]["const"]
+        assert (
+            example["schemaVersion"] == schema["properties"]["schemaVersion"]["const"]
+        )
         assert example["module"] == "oqt-mcp"

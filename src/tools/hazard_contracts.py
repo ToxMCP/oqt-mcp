@@ -24,7 +24,9 @@ def _unique(values: List[Any]) -> List[str]:
     return items
 
 
-def build_source_attribution(provenance: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def build_source_attribution(
+    provenance: Optional[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
     if not isinstance(provenance, dict):
         return None
 
@@ -135,7 +137,9 @@ def build_hazard_uncertainty_assessment(
 
     gaps: List[str] = []
     if endpoint_requested and coverage["endpointData"] == "none":
-        gaps.append("No endpoint study records were returned for the requested endpoint scope.")
+        gaps.append(
+            "No endpoint study records were returned for the requested endpoint scope."
+        )
     if profiling_requested_total:
         if coverage["profiling"] == "none":
             gaps.append("No requested profiler outputs were returned.")
@@ -147,7 +151,9 @@ def build_hazard_uncertainty_assessment(
         if coverage["metabolism"] == "none":
             gaps.append("No requested metabolism simulator outputs were returned.")
         elif coverage["metabolism"] == "partial":
-            gaps.append("Only a subset of the requested metabolism simulators returned results.")
+            gaps.append(
+                "Only a subset of the requested metabolism simulators returned results."
+            )
     if qsar_requested_total:
         if coverage["qsar"] == "none":
             gaps.append("No requested QSAR model outputs were returned.")
@@ -158,13 +164,19 @@ def build_hazard_uncertainty_assessment(
 
     confidence_drivers: List[str] = []
     if coverage["endpointData"] == "present":
-        confidence_drivers.append("Endpoint study records were retrieved from the Toolbox.")
+        confidence_drivers.append(
+            "Endpoint study records were retrieved from the Toolbox."
+        )
     if coverage["profiling"] in {"present", "partial"}:
-        confidence_drivers.append("Profiling evidence was retrieved for the selected chemical.")
+        confidence_drivers.append(
+            "Profiling evidence was retrieved for the selected chemical."
+        )
     if coverage["metabolism"] in {"present", "partial"}:
         confidence_drivers.append("Metabolism simulation results were retrieved.")
     if coverage["qsar"] in {"present", "partial"}:
-        confidence_drivers.append("QSAR predictions and applicability-domain outputs were retrieved.")
+        confidence_drivers.append(
+            "QSAR predictions and applicability-domain outputs were retrieved."
+        )
 
     present_count = sum(1 for value in coverage.values() if value == "present")
     partial_count = sum(1 for value in coverage.values() if value == "partial")
@@ -575,7 +587,11 @@ def _interpret_domain_status(value: Any) -> str:
     if not candidate:
         return "not_assessed"
     compact = candidate.replace(" ", "").replace("-", "").replace("_", "")
-    if compact in {"indomain", "insideapplicabilitydomain", "withinapplicabilitydomain"}:
+    if compact in {
+        "indomain",
+        "insideapplicabilitydomain",
+        "withinapplicabilitydomain",
+    }:
         return "in_domain"
     if "out" in compact and "domain" in compact:
         return "out_of_domain"
@@ -592,7 +608,9 @@ def build_hazard_applicability_domain(
     for item in qsar_findings or []:
         if not isinstance(item, dict):
             continue
-        raw_status = _normalise_scalar(item.get("domainStatus") or item.get("domainSummary"))
+        raw_status = _normalise_scalar(
+            item.get("domainStatus") or item.get("domainSummary")
+        )
         status = _interpret_domain_status(raw_status)
         if status != "not_assessed":
             interpreted_statuses.append(status)
@@ -683,7 +701,8 @@ def build_hazard_semantic_coverage(
     )
     typed_applicability = (
         "present"
-        if (applicability_domain or {}).get("overallStatus") not in {None, "not_applicable"}
+        if (applicability_domain or {}).get("overallStatus")
+        not in {None, "not_applicable"}
         else "not_applicable"
     )
 
@@ -757,9 +776,9 @@ def build_hazard_supports(
         isinstance(item, dict) and item.get("status") in {"ok", "partial"}
         for item in profiler_findings or []
     )
-    has_applicability_review = (
-        (applicability_domain or {}).get("overallStatus") not in {None, "not_applicable"}
-    )
+    has_applicability_review = (applicability_domain or {}).get(
+        "overallStatus"
+    ) not in {None, "not_applicable"}
     return {
         "typedStudyEvidence": has_study_evidence,
         "typedProfilerEvidence": has_profiler_evidence,
@@ -836,7 +855,9 @@ def build_endpoint_summaries_from_payload(
         if not requested_endpoint and not resolved_position:
             return []
         summary: Dict[str, Any] = {
-            "endpoint": requested_endpoint or resolved_position or "Unspecified endpoint",
+            "endpoint": requested_endpoint
+            or resolved_position
+            or "Unspecified endpoint",
             "recordCount": 0,
             "summaryLevel": "none",
             "evidenceBasis": "experimental_data",
@@ -849,7 +870,9 @@ def build_endpoint_summaries_from_payload(
 
     grouped: Dict[str, Dict[str, Any]] = {}
     for record in study_records:
-        endpoint = record.get("endpoint") or requested_endpoint or "Unspecified endpoint"
+        endpoint = (
+            record.get("endpoint") or requested_endpoint or "Unspecified endpoint"
+        )
         bucket = grouped.setdefault(
             endpoint,
             {
@@ -902,7 +925,9 @@ def build_endpoint_summaries_from_qsar_results(
                 provenance.get("title") if isinstance(provenance, dict) else None
             )
         if not endpoint:
-            endpoint = _normalise_scalar(item.get("qsar_guid")) or "Unspecified endpoint"
+            endpoint = (
+                _normalise_scalar(item.get("qsar_guid")) or "Unspecified endpoint"
+            )
 
         bucket = grouped.setdefault(
             endpoint,

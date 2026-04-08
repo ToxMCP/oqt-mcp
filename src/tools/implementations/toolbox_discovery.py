@@ -238,7 +238,9 @@ async def list_qsar_models(position: str) -> Dict[str, Any]:
 
 async def list_all_qsar_models() -> Dict[str, Any]:
     try:
-        positions, endpoint_meta = await _invoke_with_meta(qsar_client.get_endpoint_tree)
+        positions, endpoint_meta = await _invoke_with_meta(
+            qsar_client.get_endpoint_tree
+        )
     except QsarClientError as exc:
         log.error("Failed to enumerate endpoint tree for QSAR catalog: %s", exc)
         raise
@@ -283,10 +285,14 @@ async def list_all_qsar_models() -> Dict[str, Any]:
             message = str(exc)
             if "Timed out after" in message:
                 timed_out_positions.append(position)
-                warnings.append(f"Timed out while listing QSAR models for '{position}'.")
+                warnings.append(
+                    f"Timed out while listing QSAR models for '{position}'."
+                )
             else:
                 failed_positions.append(position)
-                warnings.append(f"Failed to list QSAR models for '{position}': {message}")
+                warnings.append(
+                    f"Failed to list QSAR models for '{position}': {message}"
+                )
             continue
 
         formatted = _format_meta("qsar/list", meta)

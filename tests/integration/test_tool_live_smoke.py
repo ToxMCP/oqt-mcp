@@ -8,17 +8,15 @@ import httpx
 import jsonschema
 import pytest
 
+import src.tools.implementations.o_qt_qsar_tools  # noqa: F401
+import src.tools.implementations.toolbox_discovery  # noqa: F401
+import src.tools.implementations.toolbox_execution  # noqa: F401
+import src.tools.implementations.workflow_runner  # noqa: F401
 from src.auth.rbac import ROLES
 from src.auth.service import User
 from src.config.settings import settings
 from src.qsar.client import QsarClient, QsarClientError
 from src.tools.registry import tool_registry
-
-import src.tools.implementations.o_qt_qsar_tools  # noqa: F401
-import src.tools.implementations.toolbox_discovery  # noqa: F401
-import src.tools.implementations.toolbox_execution  # noqa: F401
-import src.tools.implementations.workflow_runner  # noqa: F401
-
 
 ROOT = Path(__file__).resolve().parents[2]
 _FLAG = os.getenv("QSAR_LIVE_TESTS", "").lower()
@@ -31,9 +29,7 @@ _FALLBACK_SMILES = os.getenv("QSAR_LIVE_FALLBACK_SMILES", "CC(C)=O")
 _FALLBACK_CHEM_ID = os.getenv(
     "QSAR_LIVE_FALLBACK_CHEM_ID", "25511866-347f-d9f9-d598-d23f9501a8cb"
 )
-_FALLBACK_ANALOGUE_SMILES = os.getenv(
-    "QSAR_LIVE_FALLBACK_ANALOGUE_SMILES", "CCC(C)=O"
-)
+_FALLBACK_ANALOGUE_SMILES = os.getenv("QSAR_LIVE_FALLBACK_ANALOGUE_SMILES", "CCC(C)=O")
 _FALLBACK_PROFILER_GUID = os.getenv(
     "QSAR_LIVE_FALLBACK_PROFILER_GUID", "a06271f5-944e-4892-b0ad-fa5f7217ec14"
 )
@@ -43,7 +39,9 @@ _FALLBACK_PROFILER_CAPTION = os.getenv(
 )
 _FALLBACK_SIMULATOR_GUID = os.getenv("QSAR_LIVE_FALLBACK_SIMULATOR_GUID")
 _FALLBACK_SIMULATOR_CAPTION = os.getenv("QSAR_LIVE_FALLBACK_SIMULATOR_CAPTION")
-_FALLBACK_SIMULATOR_GUID = _FALLBACK_SIMULATOR_GUID or "981641a6-bd66-4566-8a4e-11403fe786a6"
+_FALLBACK_SIMULATOR_GUID = (
+    _FALLBACK_SIMULATOR_GUID or "981641a6-bd66-4566-8a4e-11403fe786a6"
+)
 _FALLBACK_SIMULATOR_CAPTION = _FALLBACK_SIMULATOR_CAPTION or "Autoxidation simulator"
 _FALLBACK_QSAR_GUID = os.getenv(
     "QSAR_LIVE_FALLBACK_QSAR_GUID", "aaea1ad1-a0db-1fb2-290a-6b5f52f049b2"
@@ -147,12 +145,16 @@ def _assert_binary_report(payload: dict, base64_field: str) -> bytes:
     return decoded
 
 
-async def _pick_working_profiler(client: QsarClient, chem_id: str, profilers: list[dict]):
+async def _pick_working_profiler(
+    client: QsarClient, chem_id: str, profilers: list[dict]
+):
     if not profilers:
         return None
 
     by_guid = {
-        entry.get("Guid"): entry for entry in profilers if isinstance(entry, dict) and entry.get("Guid")
+        entry.get("Guid"): entry
+        for entry in profilers
+        if isinstance(entry, dict) and entry.get("Guid")
     }
     if _FALLBACK_PROFILER_GUID and _FALLBACK_PROFILER_GUID in by_guid:
         return by_guid[_FALLBACK_PROFILER_GUID]
@@ -250,7 +252,9 @@ def live_context():
         )
         qsar_position = None
         for position in endpoint_tree:
-            position_models = _normalise_records(await client.list_qsar_models(position))
+            position_models = _normalise_records(
+                await client.list_qsar_models(position)
+            )
             if position_models:
                 qsar_position = position
                 break
@@ -271,7 +275,8 @@ def live_context():
             "profiler_caption": first_profiler.get("Caption") or first_profiler["Guid"],
             "grouping_profiler_guid": first_profiler["Guid"],
             "simulator_guid": first_simulator["Guid"],
-            "simulator_caption": first_simulator.get("Caption") or first_simulator["Guid"],
+            "simulator_caption": first_simulator.get("Caption")
+            or first_simulator["Guid"],
             "simulator_mode": "chem",
             "qsar_guid": first_model["Guid"],
             "workflow_guid": demo_workflow["Guid"],
@@ -335,7 +340,8 @@ def live_execution_context():
             "profiler_caption": first_profiler.get("Caption") or first_profiler["Guid"],
             "grouping_profiler_guid": first_profiler["Guid"],
             "simulator_guid": first_simulator["Guid"],
-            "simulator_caption": first_simulator.get("Caption") or first_simulator["Guid"],
+            "simulator_caption": first_simulator.get("Caption")
+            or first_simulator["Guid"],
             "simulator_mode": "chem",
             "qsar_guid": first_model["Guid"],
             "workflow_guid": demo_workflow["Guid"],
@@ -425,6 +431,7 @@ def test_live_discovery_and_qsar_helper_tools(live_context):
     assert list_all_qsar_models["status"] in {"ok", "partial"}
     assert list_all_qsar_models["catalog_metadata"]["positionsScanned"] >= 1
 
+
 @pytest.mark.slow
 @pytest.mark.skipif(
     not _SLOW_ENABLED,
@@ -504,26 +511,55 @@ def test_live_analyze_chemical_hazard_tool(live_execution_context):
             "endpoint": live_execution_context["analysis_endpoint"],
         },
     )
-    assert analyze_chemical_hazard["resolved_chem_id"] == live_execution_context["chem_id"]
-    assert analyze_chemical_hazard["endpoint"] == live_execution_context["analysis_endpoint"]
-    assert analyze_chemical_hazard["chemical_identity"]["chem_id"] == live_execution_context["chem_id"]
+    assert (
+        analyze_chemical_hazard["resolved_chem_id"] == live_execution_context["chem_id"]
+    )
+    assert (
+        analyze_chemical_hazard["endpoint"]
+        == live_execution_context["analysis_endpoint"]
+    )
+    assert (
+        analyze_chemical_hazard["chemical_identity"]["chem_id"]
+        == live_execution_context["chem_id"]
+    )
     assert (
         analyze_chemical_hazard["resolved_endpoint_position"]
         == "Human Health Hazards#Genetic Toxicity"
     )
-    assert analyze_chemical_hazard["data_availability"]["endpoint_data_available"] is True
+    assert (
+        analyze_chemical_hazard["data_availability"]["endpoint_data_available"] is True
+    )
     assert analyze_chemical_hazard["endpoint_summaries"][0]["recordCount"] >= 1
-    assert analyze_chemical_hazard["evidence_blocks"]["endpointData"]["status"] == "present"
-    assert analyze_chemical_hazard["applicability_domain"]["overallStatus"] == "not_applicable"
-    assert analyze_chemical_hazard["uncertainty_assessment"]["coverage"]["endpointData"] == "present"
-    portable = analyze_chemical_hazard["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]
+    assert (
+        analyze_chemical_hazard["evidence_blocks"]["endpointData"]["status"]
+        == "present"
+    )
+    assert (
+        analyze_chemical_hazard["applicability_domain"]["overallStatus"]
+        == "not_applicable"
+    )
+    assert (
+        analyze_chemical_hazard["uncertainty_assessment"]["coverage"]["endpointData"]
+        == "present"
+    )
+    portable = analyze_chemical_hazard["portable_handoffs"][
+        "oqtHazardEvidenceSummary.v1"
+    ]
     assert portable["endpointSummaries"][0]["recordCount"] >= 1
     assert portable["evidenceBlocks"]["endpointData"]["status"] == "present"
     assert portable["applicabilityDomain"]["overallStatus"] == "not_applicable"
-    assert portable["assessmentBoundary"]["scope"] == "module_scoped_toolbox_evidence_packaging"
+    assert (
+        portable["assessmentBoundary"]["scope"]
+        == "module_scoped_toolbox_evidence_packaging"
+    )
     assert portable["decisionOwner"] == "downstream_expert_review"
     assert portable["supports"]["typedStudyEvidence"] is True
-    assert portable["uncertaintyAssessment"]["semanticCoverage"]["overallQuantificationStatus"] == "qualitative_only"
+    assert (
+        portable["uncertaintyAssessment"]["semanticCoverage"][
+            "overallQuantificationStatus"
+        ]
+        == "qualitative_only"
+    )
 
 
 @pytest.mark.slow
@@ -539,7 +575,10 @@ def test_live_generate_metabolites_tool(live_execution_context):
             "simulator": live_execution_context["simulator_caption"],
         },
     )
-    assert generate_metabolites["simulator_guid"] == live_execution_context["simulator_guid"]
+    assert (
+        generate_metabolites["simulator_guid"]
+        == live_execution_context["simulator_guid"]
+    )
     assert "metabolites" in generate_metabolites
     assert generate_metabolites["simulator_provenance"]["title"]
 
@@ -573,7 +612,10 @@ def test_live_run_metabolism_simulator_tool(live_execution_context):
     else:
         metabolism_params["smiles"] = live_execution_context["smiles"]
     run_metabolism_simulator = _tool("run_metabolism_simulator", metabolism_params)
-    assert run_metabolism_simulator["simulator_guid"] == live_execution_context["simulator_guid"]
+    assert (
+        run_metabolism_simulator["simulator_guid"]
+        == live_execution_context["simulator_guid"]
+    )
     assert run_metabolism_simulator["simulator_provenance"]["title"]
 
 
@@ -669,7 +711,9 @@ def test_live_high_level_workflow_tools(workflow_payload):
         workflow_payload["portable_handoffs"]["oqtHazardEvidenceSummary.v1"],
         _load_schema("oqtHazardEvidenceSummary.v1.json"),
     )
-    hazard_summary = workflow_payload["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]
+    hazard_summary = workflow_payload["portable_handoffs"][
+        "oqtHazardEvidenceSummary.v1"
+    ]
     if hazard_summary["requestMetadata"]["requestedProfilers"]:
         assert hazard_summary["evidenceBlocks"]["profiling"]["status"] in {
             "present",
@@ -687,7 +731,12 @@ def test_live_high_level_workflow_tools(workflow_payload):
     }
     assert hazard_summary["decisionBoundary"]["reviewRequired"] is True
     assert hazard_summary["decisionOwner"] == "downstream_expert_review"
-    assert hazard_summary["uncertaintyAssessment"]["semanticCoverage"]["overallQuantificationStatus"] == "qualitative_only"
+    assert (
+        hazard_summary["uncertaintyAssessment"]["semanticCoverage"][
+            "overallQuantificationStatus"
+        ]
+        == "qualitative_only"
+    )
 
     alias_payload = _tool(
         "run_qsar_workflow",
@@ -707,7 +756,9 @@ def test_live_high_level_workflow_tools(workflow_payload):
     reason="Slow live Toolbox execution tests are disabled. Set QSAR_LIVE_SLOW_TESTS=1 to enable.",
 )
 def test_live_log_replay_tools(workflow_payload):
-    render_pdf_from_log = _tool("render_pdf_from_log", {"log": workflow_payload["log_json"]})
+    render_pdf_from_log = _tool(
+        "render_pdf_from_log", {"log": workflow_payload["log_json"]}
+    )
     assert render_pdf_from_log["size_bytes"] > 0
     _assert_pdf_base64(render_pdf_from_log["pdf_base64"])
 
@@ -720,7 +771,9 @@ def test_live_log_replay_tools(workflow_payload):
         _load_schema("oqtWorkflowRecord.v1.json"),
     )
     jsonschema.validate(
-        build_portable_handoffs_from_log["portable_handoffs"]["oqtHazardEvidenceSummary.v1"],
+        build_portable_handoffs_from_log["portable_handoffs"][
+            "oqtHazardEvidenceSummary.v1"
+        ],
         _load_schema("oqtHazardEvidenceSummary.v1.json"),
     )
 

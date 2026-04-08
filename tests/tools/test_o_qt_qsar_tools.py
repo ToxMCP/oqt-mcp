@@ -6,7 +6,6 @@ import jsonschema
 
 from src.tools.implementations import o_qt_qsar_tools as qsar_tools
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -106,16 +105,22 @@ def test_analyze_chemical_hazard(monkeypatch):
 
     monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_data", fake_endpoint_data)
     monkeypatch.setattr(qsar_tools.qsar_client, "profile_chemical", fake_profile)
-    monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree)
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree
+    )
 
     result = asyncio.run(qsar_tools.analyze_chemical_hazard("50-00-0", "Mutagenicity"))
     portable_summary = result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]
 
-    jsonschema.validate(portable_summary, _load_schema("oqtHazardEvidenceSummary.v1.json"))
+    jsonschema.validate(
+        portable_summary, _load_schema("oqtHazardEvidenceSummary.v1.json")
+    )
 
     assert result["chemical_identifier"] == "50-00-0"
     assert result["endpoint"] == "Mutagenicity"
-    assert result["resolved_endpoint_position"] == "Human Health Hazards#Genetic Toxicity"
+    assert (
+        result["resolved_endpoint_position"] == "Human Health Hazards#Genetic Toxicity"
+    )
     assert result["endpoint_resolution"]["strategy"] == "alias"
     assert result["endpoint_data"]["Endpoint"] == "Gene mutation"
     assert result["profiling"]["Profile"] == ["alert"]
@@ -126,18 +131,39 @@ def test_analyze_chemical_hazard(monkeypatch):
     assert result["applicability_domain"]["overallStatus"] == "not_applicable"
     assert result["uncertainty_assessment"]["coverage"]["endpointData"] == "present"
     assert portable_summary["endpointSummaries"][0]["endpoint"] == "Gene mutation"
-    assert portable_summary["evidenceBlocks"]["endpointData"]["references"][0]["study"] == "Ames assay"
+    assert (
+        portable_summary["evidenceBlocks"]["endpointData"]["references"][0]["study"]
+        == "Ames assay"
+    )
     assert portable_summary["applicabilityDomain"]["overallStatus"] == "not_applicable"
     assert portable_summary["requestMetadata"]["requestedEndpoints"] == ["Mutagenicity"]
-    assert portable_summary["assessmentBoundary"]["scope"] == "module_scoped_toolbox_evidence_packaging"
+    assert (
+        portable_summary["assessmentBoundary"]["scope"]
+        == "module_scoped_toolbox_evidence_packaging"
+    )
     assert portable_summary["decisionBoundary"]["reviewRequired"] is True
     assert portable_summary["decisionOwner"] == "downstream_expert_review"
     assert portable_summary["supports"]["typedStudyEvidence"] is True
     assert portable_summary["supports"]["typedProfilerEvidence"] is False
     assert portable_summary["requiredExternalInputs"]
-    assert portable_summary["uncertaintyAssessment"]["semanticCoverage"]["overallQuantificationStatus"] == "qualitative_only"
-    assert portable_summary["uncertaintyAssessment"]["semanticCoverage"]["typedStudyRecordStatus"] == "present"
-    assert portable_summary["uncertaintyAssessment"]["semanticCoverage"]["typedApplicabilityDomainStatus"] == "not_applicable"
+    assert (
+        portable_summary["uncertaintyAssessment"]["semanticCoverage"][
+            "overallQuantificationStatus"
+        ]
+        == "qualitative_only"
+    )
+    assert (
+        portable_summary["uncertaintyAssessment"]["semanticCoverage"][
+            "typedStudyRecordStatus"
+        ]
+        == "present"
+    )
+    assert (
+        portable_summary["uncertaintyAssessment"]["semanticCoverage"][
+            "typedApplicabilityDomainStatus"
+        ]
+        == "not_applicable"
+    )
     assert result["endpoint_data_provenance"][0]["study"] == "Ames assay"
     assert result["endpoint_data_provenance"][0]["citation"] == "Doe et al. 2024"
     assert result["endpoint_data_provenance"][0]["owner"] == "Curated DB"
@@ -169,7 +195,9 @@ def test_analyze_chemical_hazard_falls_back_to_raw_endpoint(monkeypatch):
         calls["profile"] = (chemical_identifier,)
         return {"Profile": []}
 
-    monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree)
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree
+    )
     monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_data", fake_endpoint_data)
     monkeypatch.setattr(qsar_tools.qsar_client, "profile_chemical", fake_profile)
 
@@ -197,7 +225,9 @@ def test_analyze_chemical_hazard_with_direct_chem_id_populates_identity(monkeypa
     async def fake_profile(chemical_identifier: str):
         return {"Profile": []}
 
-    monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree)
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree
+    )
     monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_data", fake_endpoint_data)
     monkeypatch.setattr(qsar_tools.qsar_client, "profile_chemical", fake_profile)
 
@@ -206,7 +236,12 @@ def test_analyze_chemical_hazard_with_direct_chem_id_populates_identity(monkeypa
 
     assert result["chemical_identity"]["chem_id"] == chem_id
     assert result["chemical_identity"]["preferred_name"] == chem_id
-    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["chemicalIdentity"]["chemId"] == chem_id
+    assert (
+        result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["chemicalIdentity"][
+            "chemId"
+        ]
+        == chem_id
+    )
 
 
 def test_generate_metabolites(monkeypatch):
@@ -220,9 +255,7 @@ def test_generate_metabolites(monkeypatch):
         return {"Guid": simulator_guid, "Caption": "Rat liver", "Donator": "OECD"}
 
     monkeypatch.setattr(qsar_tools.qsar_client, "generate_metabolites", fake_generate)
-    monkeypatch.setattr(
-        qsar_tools.qsar_client, "list_simulators", fake_list_simulators
-    )
+    monkeypatch.setattr(qsar_tools.qsar_client, "list_simulators", fake_list_simulators)
     monkeypatch.setattr(
         qsar_tools.qsar_client, "get_simulator_info", fake_simulator_info
     )
@@ -237,7 +270,9 @@ def test_generate_metabolites(monkeypatch):
     assert result["simulator_provenance"]["owner"] == "OECD"
 
 
-def test_analyze_chemical_hazard_times_out_profiling_but_returns_endpoint_data(monkeypatch):
+def test_analyze_chemical_hazard_times_out_profiling_but_returns_endpoint_data(
+    monkeypatch,
+):
     async def fake_get_endpoint_tree():
         return ["Human Health Hazards#Genetic Toxicity"]
 
@@ -258,7 +293,9 @@ def test_analyze_chemical_hazard_times_out_profiling_but_returns_endpoint_data(m
         await asyncio.sleep(0.05)
         return {"Profile": ["alert"]}
 
-    monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree)
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "get_endpoint_tree", fake_get_endpoint_tree
+    )
     monkeypatch.setattr(qsar_tools.qsar_client, "get_endpoint_data", fake_endpoint_data)
     monkeypatch.setattr(qsar_tools.qsar_client, "profile_chemical", fake_profile)
     monkeypatch.setattr(

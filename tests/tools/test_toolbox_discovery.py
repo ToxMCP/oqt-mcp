@@ -179,7 +179,14 @@ def test_get_metadata_hierarchy(monkeypatch):
 
 def test_list_qsar_models(monkeypatch):
     async def fake_list_models(position: str):
-        return [{"Guid": "model", "Position": position, "Caption": "Model", "Donator": "EPA"}]
+        return [
+            {
+                "Guid": "model",
+                "Position": position,
+                "Caption": "Model",
+                "Donator": "EPA",
+            }
+        ]
 
     monkeypatch.setattr(discovery.qsar_client, "list_qsar_models", fake_list_models)
 

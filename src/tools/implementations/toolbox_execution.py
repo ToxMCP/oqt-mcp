@@ -109,7 +109,9 @@ def _attach_toolbox(result: Dict[str, Any], meta: Dict[str, Any]) -> Dict[str, A
 
 async def _fetch_model_provenance(model_id: str) -> tuple[dict | None, dict | None]:
     try:
-        payload, meta = await _invoke_with_meta(qsar_client.get_model_metadata, model_id)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_model_metadata, model_id
+        )
     except QsarClientError as exc:
         log.warning("QSAR model metadata lookup failed for %s: %s", model_id, exc)
         return None, None
@@ -120,7 +122,9 @@ async def _fetch_profiler_provenance(
     profiler_guid: str,
 ) -> tuple[dict | None, dict | None]:
     try:
-        payload, meta = await _invoke_with_meta(qsar_client.get_profiler_info, profiler_guid)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_profiler_info, profiler_guid
+        )
     except QsarClientError as exc:
         log.warning("Profiler metadata lookup failed for %s: %s", profiler_guid, exc)
         return None, None
@@ -135,9 +139,7 @@ async def _fetch_simulator_provenance(
             qsar_client.get_simulator_info, simulator_guid
         )
     except QsarClientError as exc:
-        log.warning(
-            "Simulator metadata lookup failed for %s: %s", simulator_guid, exc
-        )
+        log.warning("Simulator metadata lookup failed for %s: %s", simulator_guid, exc)
         return None, None
     return build_provenance(payload), _format_meta("metabolism/info", meta)
 
@@ -222,7 +224,8 @@ class PdfFromLogParams(BaseModel):
 
 class PortableHandoffsFromLogParams(BaseModel):
     log: dict = Field(
-        ..., description="Stored O-QT log bundle captured from a workflow or grouping run."
+        ...,
+        description="Stored O-QT log bundle captured from a workflow or grouping run.",
     )
     workflow_type: str = Field(
         "auto",

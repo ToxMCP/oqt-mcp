@@ -12,8 +12,8 @@ from src.qsar import QsarClientError, qsar_client
 from src.tools.hazard_contracts import (
     build_decision_owner,
     build_endpoint_summaries_from_payload,
-    build_hazard_assessment_boundary,
     build_hazard_applicability_domain,
+    build_hazard_assessment_boundary,
     build_hazard_decision_boundary,
     build_hazard_evidence_blocks,
     build_hazard_required_external_inputs,
@@ -35,7 +35,9 @@ log = logging.getLogger(__name__)
 _TOOLBOX_SOURCE_SYSTEM = "OECD QSAR Toolbox WebAPI"
 _GENERATED_BY_VERSION = "O-QT MCP Server v0.3.0"
 _TOXMCP_REPOSITORY_URL = "https://github.com/ToxMCP/oqt-mcp"
-_TOOLBOX_COMPATIBILITY_NOTE = "Current WebAPI client targets /api/v6 compatibility routes."
+_TOOLBOX_COMPATIBILITY_NOTE = (
+    "Current WebAPI client targets /api/v6 compatibility routes."
+)
 
 _ENDPOINT_POSITION_ALIASES = {
     "mutagenicity": "Human Health Hazards#Genetic Toxicity",
@@ -205,11 +207,17 @@ async def _resolve_endpoint_position(
         return alias, resolution, endpoint_tree_meta
 
     exact_match = next(
-        (position for position in positions if str(position).strip().lower() == raw_endpoint.lower()),
+        (
+            position
+            for position in positions
+            if str(position).strip().lower() == raw_endpoint.lower()
+        ),
         None,
     )
     if exact_match:
-        resolution.update({"strategy": "exact-position", "resolved_position": exact_match})
+        resolution.update(
+            {"strategy": "exact-position", "resolved_position": exact_match}
+        )
         return exact_match, resolution, endpoint_tree_meta
 
     leaf_match = next(
@@ -242,7 +250,9 @@ async def _resolve_endpoint_position(
 
 async def _fetch_model_provenance(model_id: str) -> tuple[dict | None, dict | None]:
     try:
-        payload, meta = await _invoke_with_meta(qsar_client.get_model_metadata, model_id)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_model_metadata, model_id
+        )
     except QsarClientError as exc:
         log.warning("QSAR model metadata lookup failed for %s: %s", model_id, exc)
         return None, None
@@ -257,9 +267,7 @@ async def _fetch_simulator_provenance(
             qsar_client.get_simulator_info, simulator_guid
         )
     except QsarClientError as exc:
-        log.warning(
-            "Simulator metadata lookup failed for %s: %s", simulator_guid, exc
-        )
+        log.warning("Simulator metadata lookup failed for %s: %s", simulator_guid, exc)
         return None, None
     return build_provenance(payload), _format_meta("metabolism/info", meta)
 
@@ -315,11 +323,15 @@ async def run_qsar_prediction(smiles: str, model_id: str) -> dict:
     except QsarClientError as exc:
         log.warning("SMILES lookup failed (%s); falling back to run_prediction.", exc)
         payload = await qsar_client.run_prediction(smiles, model_id)
-        result = dict(payload) if isinstance(payload, dict) else {
-            "smiles": smiles,
-            "model_id": model_id,
-            "prediction": payload,
-        }
+        result = (
+            dict(payload)
+            if isinstance(payload, dict)
+            else {
+                "smiles": smiles,
+                "model_id": model_id,
+                "prediction": payload,
+            }
+        )
         if model_provenance:
             result["model_provenance"] = model_provenance
         toolbox_meta = _aggregate_meta(_format_meta("about/object", model_meta))
@@ -346,11 +358,15 @@ async def run_qsar_prediction(smiles: str, model_id: str) -> dict:
     except QsarClientError as exc:
         log.warning("QSAR apply failed (%s); falling back to run_prediction.", exc)
         payload = await qsar_client.run_prediction(smiles, model_id)
-        result = dict(payload) if isinstance(payload, dict) else {
-            "smiles": smiles,
-            "model_id": model_id,
-            "prediction": payload,
-        }
+        result = (
+            dict(payload)
+            if isinstance(payload, dict)
+            else {
+                "smiles": smiles,
+                "model_id": model_id,
+                "prediction": payload,
+            }
+        )
         if model_provenance:
             result["model_provenance"] = model_provenance
         toolbox_meta = _aggregate_meta(
@@ -536,7 +552,10 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
     summary["profiling"] = profiling_payload
     summary["data_availability"] = data_availability
     generated_at = (
-        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
     endpoint_study_records = build_endpoint_study_records(endpoint_payload)
     summary["endpoint_study_records"] = endpoint_study_records
@@ -570,10 +589,12 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
         uncertainty_assessment=summary["uncertainty_assessment"],
     )
     summary["applicability_domain"] = build_hazard_applicability_domain([])
-    summary["uncertainty_assessment"]["semanticCoverage"] = build_hazard_semantic_coverage(
-        endpoint_summaries=summary["endpoint_summaries"],
-        applicability_domain=summary["applicability_domain"],
-        uncertainty_assessment=summary["uncertainty_assessment"],
+    summary["uncertainty_assessment"]["semanticCoverage"] = (
+        build_hazard_semantic_coverage(
+            endpoint_summaries=summary["endpoint_summaries"],
+            applicability_domain=summary["applicability_domain"],
+            uncertainty_assessment=summary["uncertainty_assessment"],
+        )
     )
 
     # Add helpful suggestions if no data was found
@@ -603,7 +624,9 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
             "module": "oqt-mcp",
             "chemicalIdentity": {
                 "inputIdentifier": identifier,
-                "preferredName": result.get("chemical_identity", {}).get("preferred_name")
+                "preferredName": result.get("chemical_identity", {}).get(
+                    "preferred_name"
+                )
                 or identifier,
                 "chemId": chem_id,
                 **(
@@ -667,30 +690,27 @@ async def analyze_chemical_hazard(chemical_identifier: str, endpoint: str) -> di
                         ),
                         **(
                             {"durationMs": float(call["duration_ms"])}
-                        if isinstance(call.get("duration_ms"), (int, float))
-                        else {}
-                    ),
-                    **(
-                        {"attempts": int(call["attempts"])}
-                        if isinstance(call.get("attempts"), (int, float))
-                        else {}
-                    ),
-                    **(
-                        {"timeoutProfile": str(call["timeout_profile"])}
-                        if call.get("timeout_profile")
-                        else {}
-                    ),
-                        **(
-                            {"reference": chem_id}
-                            if chem_id
+                            if isinstance(call.get("duration_ms"), (int, float))
                             else {}
                         ),
+                        **(
+                            {"attempts": int(call["attempts"])}
+                            if isinstance(call.get("attempts"), (int, float))
+                            else {}
+                        ),
+                        **(
+                            {"timeoutProfile": str(call["timeout_profile"])}
+                            if call.get("timeout_profile")
+                            else {}
+                        ),
+                        **({"reference": chem_id} if chem_id else {}),
                     }
                     for call in result.get("toolbox", {}).get("calls", [])
                     if isinstance(call, dict) and call.get("endpoint")
                 ],
             },
-            "limitations": data_availability["warnings"] or [
+            "limitations": data_availability["warnings"]
+            or [
                 "This summary does not include explicit profiler, metabolism, or QSAR model executions."
             ],
             "context": None,

@@ -1,11 +1,11 @@
 import base64
 import copy
-from datetime import datetime, timezone
 import hashlib
 import inspect
 import json
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -16,19 +16,19 @@ from src.qsar import QsarClientError, qsar_client
 from src.tools.hazard_contracts import (
     build_decision_owner,
     build_endpoint_summaries_from_qsar_results,
-    build_hazard_assessment_boundary,
     build_hazard_applicability_domain,
+    build_hazard_assessment_boundary,
     build_hazard_decision_boundary,
     build_hazard_evidence_blocks,
     build_hazard_required_external_inputs,
     build_hazard_semantic_coverage,
     build_hazard_supports,
     build_hazard_uncertainty_assessment,
-    build_request_metadata,
     build_read_across_assessment_boundary,
     build_read_across_decision_boundary,
     build_read_across_required_external_inputs,
     build_read_across_supports,
+    build_request_metadata,
     build_source_attribution,
 )
 from src.tools.provenance import build_provenance
@@ -114,7 +114,8 @@ class WorkflowParams(BaseModel):
 
 class GroupingJustificationParams(BaseModel):
     identifier: str = Field(
-        ..., description="Target chemical identifier (common name, CAS number, or SMILES)."
+        ...,
+        description="Target chemical identifier (common name, CAS number, or SMILES).",
     )
     search_type: str = Field(
         "auto",
@@ -133,7 +134,8 @@ class GroupingJustificationParams(BaseModel):
         description="Endpoints that require justification in the grouping dossier.",
     )
     route_of_exposure: Optional[str] = Field(
-        None, description="Route of exposure relevant to the endpoints under consideration."
+        None,
+        description="Route of exposure relevant to the endpoints under consideration.",
     )
     grouping_hypothesis: str = Field(
         ...,
@@ -164,7 +166,8 @@ class GroupingJustificationParams(BaseModel):
         description="Maximum residual uncertainty tolerated for the stated purpose (`low`, `medium`, `high`).",
     )
     context: Optional[str] = Field(
-        None, description="Optional extra narrative instructions for the generated dossier."
+        None,
+        description="Optional extra narrative instructions for the generated dossier.",
     )
 
     @field_validator("search_type", "analogue_search_type", mode="before")
@@ -229,7 +232,11 @@ def _first_present(record: Dict[str, Any], candidates: List[str]) -> Any:
 
 def _chemical_summary(hit: Dict[str, Any], identifier: str) -> Dict[str, Any]:
     raw_names = hit.get("Names")
-    names = [str(name).strip() for name in raw_names if str(name).strip()] if isinstance(raw_names, list) else []
+    names = (
+        [str(name).strip() for name in raw_names if str(name).strip()]
+        if isinstance(raw_names, list)
+        else []
+    )
     preferred_name = (
         names[0]
         if names
@@ -459,7 +466,9 @@ async def _collect_structure_signature(
 
     if signature["canonical_smiles"] or signature["connectivity"]:
         signature["status"] = "assessed"
-        signature["notes"] = "Derived structure signature from Toolbox structure helpers."
+        signature["notes"] = (
+            "Derived structure signature from Toolbox structure helpers."
+        )
         if notes:
             signature["notes"] += " " + " ".join(notes)
     else:
@@ -512,7 +521,9 @@ def _build_structure_comparison(
         else:
             missing_pairs += 1
             status = "not_assessed"
-            notes.append("Comparable structure signatures were not available for both substances.")
+            notes.append(
+                "Comparable structure signatures were not available for both substances."
+            )
 
         comparisons.append(
             {
@@ -632,7 +643,9 @@ def _build_physicochemical_comparison(
     }
 
 
-def _structure_evidence_rows(structure_comparison: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _structure_evidence_rows(
+    structure_comparison: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     target = structure_comparison.get("target", {})
     if target.get("input_smiles"):
@@ -656,9 +669,11 @@ def _structure_evidence_rows(structure_comparison: Dict[str, Any]) -> List[Dict[
                 "canonicalize_structure/structure_connectivity",
                 comparison.get("status", "not_assessed"),
                 comparison.get("notes", ""),
-                reference=str(comparison.get("source_chem_id"))
-                if comparison.get("source_chem_id")
-                else None,
+                reference=(
+                    str(comparison.get("source_chem_id"))
+                    if comparison.get("source_chem_id")
+                    else None
+                ),
             )
         )
     return rows
@@ -677,9 +692,11 @@ def _physchem_evidence_rows(
                 "search_chemicals",
                 comparison.get("status", "not_assessed"),
                 comparison.get("notes", ""),
-                reference=str(comparison.get("source_chem_id"))
-                if comparison.get("source_chem_id")
-                else None,
+                reference=(
+                    str(comparison.get("source_chem_id"))
+                    if comparison.get("source_chem_id")
+                    else None
+                ),
             )
         )
     return rows
@@ -865,7 +882,9 @@ async def _fetch_model_provenance(
     if qsar_guid in cache:
         return cache[qsar_guid], None
     try:
-        payload, meta = await _invoke_with_meta(qsar_client.get_model_metadata, qsar_guid)
+        payload, meta = await _invoke_with_meta(
+            qsar_client.get_model_metadata, qsar_guid
+        )
     except QsarClientError as exc:
         log.warning("QSAR model metadata lookup failed for %s: %s", qsar_guid, exc)
         cache[qsar_guid] = None
@@ -903,9 +922,7 @@ async def _fetch_simulator_provenance(
             qsar_client.get_simulator_info, simulator_guid
         )
     except QsarClientError as exc:
-        log.warning(
-            "Simulator metadata lookup failed for %s: %s", simulator_guid, exc
-        )
+        log.warning("Simulator metadata lookup failed for %s: %s", simulator_guid, exc)
         cache[simulator_guid] = None
         return None, None
     provenance = build_provenance(payload)
@@ -983,9 +1000,15 @@ def _build_profiler_findings(
                 if details:
                     provenance_clause = f" ({'; '.join(details)})"
             subject_roles = _unique(
-                [str(item.get("subject_role")) for item in matches if item.get("subject_role")]
+                [
+                    str(item.get("subject_role"))
+                    for item in matches
+                    if item.get("subject_role")
+                ]
             )
-            subject_clause = f" across {', '.join(subject_roles)}" if subject_roles else ""
+            subject_clause = (
+                f" across {', '.join(subject_roles)}" if subject_roles else ""
+            )
             findings.append(
                 {
                     "profilerGuid": requested_id,
@@ -1008,9 +1031,11 @@ def _build_profiler_findings(
             {
                 "profilerGuid": requested_id,
                 "status": "error" if error_messages else "not_run",
-                "summary": " ".join(error_messages)
-                if error_messages
-                else "Requested profiler evidence was not returned.",
+                "summary": (
+                    " ".join(error_messages)
+                    if error_messages
+                    else "Requested profiler evidence was not returned."
+                ),
             }
         )
     return findings
@@ -1068,9 +1093,11 @@ def _build_metabolism_findings(
             {
                 "simulatorGuid": requested_id,
                 "status": "error" if error_messages else "not_run",
-                "summary": " ".join(error_messages)
-                if error_messages
-                else "Requested metabolism evidence was not returned.",
+                "summary": (
+                    " ".join(error_messages)
+                    if error_messages
+                    else "Requested metabolism evidence was not returned."
+                ),
             }
         )
     return findings
@@ -1129,7 +1156,11 @@ def _build_qsar_findings(
                     + _summarise_payload(matches[0].get("prediction")),
                     "domainSummary": _summarise_payload(matches[0].get("domain")),
                     **({"endpoint": endpoint} if endpoint else {}),
-                    **({"predictedValue": prediction_value} if prediction_value is not None else {}),
+                    **(
+                        {"predictedValue": prediction_value}
+                        if prediction_value is not None
+                        else {}
+                    ),
                     **({"unit": unit} if unit else {}),
                     **({"domainStatus": domain_status} if domain_status else {}),
                     **(
@@ -1254,8 +1285,7 @@ def _build_portable_workflow_record(
             "requestedSimulators": _unique(inputs.get("simulator_guids", []) or []),
             "requestedQsarModels": _unique(inputs.get("qsar_guids", []) or []),
             "toolboxCallCount": len(toolbox_meta.get("calls", []) or []),
-            "toolboxTotalDurationMs": toolbox_meta.get("total_duration_ms", 0.0)
-            or 0.0,
+            "toolboxTotalDurationMs": toolbox_meta.get("total_duration_ms", 0.0) or 0.0,
             "errors": [str(message) for message in log_bundle.get("errors", []) or []],
         },
         "provenance": _build_workflow_provenance(generated_at, toolbox_meta),
@@ -1273,11 +1303,15 @@ def _build_workflow_portable_handoffs(
     pdf_bytes: Optional[bytes] = None,
 ) -> Dict[str, Any]:
     inputs = log_bundle.get("inputs", {})
-    identifier = str(inputs.get("identifier") or log_bundle.get("identifier") or "").strip()
+    identifier = str(
+        inputs.get("identifier") or log_bundle.get("identifier") or ""
+    ).strip()
     search_type = str(inputs.get("search_type") or "auto")
     selected_summary = None
     if isinstance(log_bundle.get("selected_chemical"), dict):
-        selected_summary = _chemical_summary(log_bundle["selected_chemical"], identifier)
+        selected_summary = _chemical_summary(
+            log_bundle["selected_chemical"], identifier
+        )
 
     generated_at = _iso_utc_now()
     workflow_id = _handoff_record_id("oqtwf")
@@ -1353,7 +1387,9 @@ def _build_workflow_portable_handoffs(
     if inputs.get("simulator_guids") and not any(
         item.get("status") == "ok" for item in metabolism_findings
     ):
-        limitations.append("No requested metabolism evidence was returned successfully.")
+        limitations.append(
+            "No requested metabolism evidence was returned successfully."
+        )
     if inputs.get("qsar_guids") and not any(
         item.get("status") == "ok" for item in qsar_findings
     ):
@@ -1442,7 +1478,9 @@ def _build_applicability_domain(
     grouping_justification: Dict[str, Any],
 ) -> Dict[str, Any]:
     report_context = grouping_justification.get("report_context", {}) or {}
-    similarity_assessment = grouping_justification.get("similarity_assessment", {}) or {}
+    similarity_assessment = (
+        grouping_justification.get("similarity_assessment", {}) or {}
+    )
     uncertainty = grouping_justification.get("uncertainty_assessment", {}) or {}
     hypothesis = _normalise_scalar(report_context.get("grouping_hypothesis"))
     inclusion_criteria: List[str] = []
@@ -1451,7 +1489,9 @@ def _build_applicability_domain(
     inclusion_criteria.append(
         "Target and source substances must resolve to Toolbox records with stable identifiers and enough comparison data to support analogue evaluation."
     )
-    endpoints = [str(item) for item in report_context.get("endpoints", []) or [] if item]
+    endpoints = [
+        str(item) for item in report_context.get("endpoints", []) or [] if item
+    ]
     if endpoints:
         inclusion_criteria.append(
             f"Assessment scope is limited to the requested endpoint set: {', '.join(endpoints)}."
@@ -1464,7 +1504,9 @@ def _build_applicability_domain(
 
     exclusion_criteria = []
     for excluded in grouping_justification.get("excluded_analogues", []) or []:
-        analogue_identifier = _normalise_scalar(excluded.get("identifier")) or "Unknown analogue"
+        analogue_identifier = (
+            _normalise_scalar(excluded.get("identifier")) or "Unknown analogue"
+        )
         reason = _normalise_scalar(excluded.get("reason")) or "Unspecified exclusion."
         exclusion_criteria.append(f"{analogue_identifier}: {reason}")
 
@@ -1527,7 +1569,12 @@ def _build_portable_data_matrix(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     for row in rows or []:
         status = _normalise_status(row.get("status")) or "not_run"
         subject_role = _normalise_scalar(row.get("subject_role")) or "unknown"
-        if subject_role not in {"target", "source_analogue", "category_member", "unknown"}:
+        if subject_role not in {
+            "target",
+            "source_analogue",
+            "category_member",
+            "unknown",
+        }:
             subject_role = "unknown"
         portable_row: Dict[str, Any] = {
             "subjectRole": subject_role,
@@ -1582,7 +1629,8 @@ def _build_portable_uncertainty_table(
         "acceptableForContext": acceptable,
         "decisionContextFit": fit_message,
         "whatIsNotAddressed": [
-            str(item) for item in uncertainty_assessment.get("what_is_not_addressed", []) or []
+            str(item)
+            for item in uncertainty_assessment.get("what_is_not_addressed", []) or []
         ],
         "rows": rows,
     }
@@ -1696,7 +1744,9 @@ def _build_grouping_portable_handoffs(
     if status != "ok":
         limitations.append(f"Grouping dossier completed with status '{status}'.")
     for excluded in grouping_justification.get("excluded_analogues", []) or []:
-        analogue_identifier = _normalise_scalar(excluded.get("identifier")) or "Unknown analogue"
+        analogue_identifier = (
+            _normalise_scalar(excluded.get("identifier")) or "Unknown analogue"
+        )
         reason = _normalise_scalar(excluded.get("reason")) or "Unspecified exclusion."
         limitations.append(f"{analogue_identifier}: {reason}")
     limitations.extend(grouping_justification.get("recommended_follow_ups", []) or [])
@@ -1805,10 +1855,10 @@ def build_portable_handoffs_from_log_bundle(
 
     source_log = log or {}
     log_bundle = source_log
-    if (
-        isinstance(source_log.get("mcp_workflow"), dict)
-        and requested_type in {"auto", "workflow"}
-    ):
+    if isinstance(source_log.get("mcp_workflow"), dict) and requested_type in {
+        "auto",
+        "workflow",
+    }:
         log_bundle = source_log["mcp_workflow"]
 
     if requested_type == "auto":
@@ -1967,7 +2017,9 @@ async def run_oqt_multiagent_workflow(
             message = f"No Toolbox records found for '{identifier_display}'."
             log.warning(message)
             log_bundle["errors"].append(message)
-            summary_lines.append(f"* No Toolbox records matched `{identifier_display}`.")
+            summary_lines.append(
+                f"* No Toolbox records matched `{identifier_display}`."
+            )
             return _build_workflow_response(
                 status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls)
             )
@@ -2031,8 +2083,10 @@ async def run_oqt_multiagent_workflow(
             payload, simulator_meta = await qsar_client.simulate_metabolites_for_chem(
                 simulator_guid, chem_id, with_meta=True
             )
-            simulator_provenance, simulator_info_entry = await _fetch_simulator_provenance(
-                simulator_guid, simulator_provenance_cache
+            simulator_provenance, simulator_info_entry = (
+                await _fetch_simulator_provenance(
+                    simulator_guid, simulator_provenance_cache
+                )
             )
             simulator_result = {"simulator_guid": simulator_guid, "result": payload}
             if simulator_provenance:
@@ -2280,58 +2334,72 @@ def _build_similarity_assessment(
 
     return {
         "structural_similarity": {
-            "status": "assessed"
-            if structure_summary.get("assessed_pairs")
-            else "limited"
-            if analogue_count and structure_comparison.get("target", {}).get("input_smiles")
-            else "not_assessed",
-            "data_quality": "medium"
-            if structure_summary.get("assessed_pairs")
-            else "low",
-            "strength_of_evidence": "medium"
-            if structure_summary.get("assessed_pairs")
-            else "low",
+            "status": (
+                "assessed"
+                if structure_summary.get("assessed_pairs")
+                else (
+                    "limited"
+                    if analogue_count
+                    and structure_comparison.get("target", {}).get("input_smiles")
+                    else "not_assessed"
+                )
+            ),
+            "data_quality": (
+                "medium" if structure_summary.get("assessed_pairs") else "low"
+            ),
+            "strength_of_evidence": (
+                "medium" if structure_summary.get("assessed_pairs") else "low"
+            ),
             "comments": (
                 f"Assessed {structure_summary.get('assessed_pairs', 0)} target/source pair(s); "
                 f"{structure_summary.get('canonical_exact_matches', 0)} canonical SMILES exact match(es) and "
                 f"{structure_summary.get('connectivity_exact_matches', 0)} connectivity exact match(es)."
                 if structure_summary.get("assessed_pairs")
-                else "Source analogues were resolved, but comparable structure signatures were not available for the assessed pairs."
-                if analogue_count
-                else "No source analogues were provided, so structural similarity could not be documented."
+                else (
+                    "Source analogues were resolved, but comparable structure signatures were not available for the assessed pairs."
+                    if analogue_count
+                    else "No source analogues were provided, so structural similarity could not be documented."
+                )
             ),
         },
         "physicochemical_similarity": {
-            "status": "assessed"
-            if physchem_summary.get("assessed_pairs")
-            else "limited"
-            if analogue_count and physicochemical_comparison.get("target_descriptors")
-            else "not_assessed",
-            "data_quality": "medium"
-            if physchem_summary.get("shared_descriptor_count")
-            else "low",
-            "strength_of_evidence": "medium"
-            if physchem_summary.get("shared_descriptor_count")
-            else "low",
+            "status": (
+                "assessed"
+                if physchem_summary.get("assessed_pairs")
+                else (
+                    "limited"
+                    if analogue_count
+                    and physicochemical_comparison.get("target_descriptors")
+                    else "not_assessed"
+                )
+            ),
+            "data_quality": (
+                "medium" if physchem_summary.get("shared_descriptor_count") else "low"
+            ),
+            "strength_of_evidence": (
+                "medium" if physchem_summary.get("shared_descriptor_count") else "low"
+            ),
             "comments": (
                 f"Compared {physchem_summary.get('shared_descriptor_count', 0)} shared physicochemical descriptor(s) across "
                 f"{physchem_summary.get('assessed_pairs', 0)} target/source pair(s)."
                 if physchem_summary.get("shared_descriptor_count")
-                else "Target and source substances were resolved, but no overlapping physicochemical descriptors were exposed in the available records."
-                if analogue_count
-                else "No source analogues were provided, so physicochemical similarity could not be documented."
+                else (
+                    "Target and source substances were resolved, but no overlapping physicochemical descriptors were exposed in the available records."
+                    if analogue_count
+                    else "No source analogues were provided, so physicochemical similarity could not be documented."
+                )
             ),
         },
         "reactivity_profile_similarity": {
-            "status": "assessed"
-            if target_profiles and source_profiles
-            else "limited"
-            if target_profiles
-            else "not_assessed",
+            "status": (
+                "assessed"
+                if target_profiles and source_profiles
+                else "limited" if target_profiles else "not_assessed"
+            ),
             "data_quality": "medium" if target_profiles else "low",
-            "strength_of_evidence": "medium"
-            if target_profiles and source_profiles
-            else "low",
+            "strength_of_evidence": (
+                "medium" if target_profiles and source_profiles else "low"
+            ),
             "comments": (
                 f"Profiler evidence was gathered under the hypothesis: {grouping_hypothesis}"
                 if target_profiles
@@ -2339,21 +2407,23 @@ def _build_similarity_assessment(
             ),
         },
         "adme_tk_similarity": {
-            "status": "assessed"
-            if target_simulators and source_simulators
-            else "limited"
-            if target_simulators
-            else "not_assessed",
+            "status": (
+                "assessed"
+                if target_simulators and source_simulators
+                else "limited" if target_simulators else "not_assessed"
+            ),
             "data_quality": "medium" if target_simulators else "low",
-            "strength_of_evidence": "medium"
-            if target_simulators and source_simulators
-            else "low",
+            "strength_of_evidence": (
+                "medium" if target_simulators and source_simulators else "low"
+            ),
             "comments": (
                 "Metabolism simulator output is available for the target and at least one source analogue."
                 if target_simulators and source_simulators
-                else "Metabolism simulation is only available for the target substance."
-                if target_simulators
-                else "No metabolism simulator evidence was collected."
+                else (
+                    "Metabolism simulation is only available for the target substance."
+                    if target_simulators
+                    else "No metabolism simulator evidence was collected."
+                )
             ),
         },
         "bioactivity_similarity": {
@@ -2367,13 +2437,13 @@ def _build_similarity_assessment(
             ),
         },
         "mechanistic_similarity": {
-            "status": "limited"
-            if profiler_groupings or simulator_results
-            else "not_assessed",
-            "data_quality": "medium" if profiler_groupings or simulator_results else "low",
-            "strength_of_evidence": "medium"
-            if profiler_groupings
-            else "low",
+            "status": (
+                "limited" if profiler_groupings or simulator_results else "not_assessed"
+            ),
+            "data_quality": (
+                "medium" if profiler_groupings or simulator_results else "low"
+            ),
+            "strength_of_evidence": "medium" if profiler_groupings else "low",
             "comments": (
                 "Mechanistic support is based on profiler grouping and/or metabolism evidence."
                 if profiler_groupings or simulator_results
@@ -2438,7 +2508,9 @@ def _build_uncertainty_assessment(
     if not source_analogues:
         overall_level = "high"
 
-    accepted_level = accepted_uncertainty_level if accepted_uncertainty_level in ranks else "medium"
+    accepted_level = (
+        accepted_uncertainty_level if accepted_uncertainty_level in ranks else "medium"
+    )
     return {
         "accepted_level": accepted_level,
         "overall_level": overall_level,
@@ -2480,14 +2552,24 @@ def _build_endpoint_justifications(
             )
         else:
             strategy = "weight_of_evidence_preparation_only"
-            conclusion = (
-                f"No source analogue set was resolved for {endpoint}; additional analogue selection is required before read-across can be defended."
-            )
+            conclusion = f"No source analogue set was resolved for {endpoint}; additional analogue selection is required before read-across can be defended."
 
         support_bits = [
-            f"{len(source_analogues)} source analogue(s)" if source_analogues else "no resolved source analogues",
-            f"{len(profiler_guids)} profiler(s)" if profiler_guids else "no profiler evidence",
-            f"{len(simulator_guids)} simulator(s)" if simulator_guids else "no metabolism evidence",
+            (
+                f"{len(source_analogues)} source analogue(s)"
+                if source_analogues
+                else "no resolved source analogues"
+            ),
+            (
+                f"{len(profiler_guids)} profiler(s)"
+                if profiler_guids
+                else "no profiler evidence"
+            ),
+            (
+                f"{len(simulator_guids)} simulator(s)"
+                if simulator_guids
+                else "no metabolism evidence"
+            ),
             f"{len(qsar_guids)} QSAR model(s)" if qsar_guids else "no QSAR evidence",
         ]
         rationale = (
@@ -2566,13 +2648,9 @@ def _build_grouping_markdown(
     lines.append(f"* Decision context: {report_context['decision_context']}")
     lines.append(f"* Problem formulation: {report_context['problem_formulation']}")
     lines.append(f"* Grouping hypothesis: {report_context['grouping_hypothesis']}")
-    lines.append(
-        f"* Endpoints: {', '.join(report_context['endpoints'])}"
-    )
+    lines.append(f"* Endpoints: {', '.join(report_context['endpoints'])}")
     if report_context.get("route_of_exposure"):
-        lines.append(
-            f"* Route of exposure: {report_context['route_of_exposure']}"
-        )
+        lines.append(f"* Route of exposure: {report_context['route_of_exposure']}")
     if report_context.get("context"):
         lines.append(f"* Additional context: {report_context['context']}")
 
@@ -2844,9 +2922,7 @@ async def build_grouping_justification(
     evidence_matrix.extend(_physchem_evidence_rows(physicochemical_comparison))
 
     if not target_chem_id:
-        message = (
-            f"Target '{target_name}' did not expose a chemId, so profiler, grouping, metabolism, and QSAR calls cannot run."
-        )
+        message = f"Target '{target_name}' did not expose a chemId, so profiler, grouping, metabolism, and QSAR calls cannot run."
         log_bundle["errors"].append(message)
 
     profiler_results: List[Dict[str, Any]] = []
@@ -2861,10 +2937,15 @@ async def build_grouping_justification(
         for profiler_guid in profiler_guids:
             try:
                 payload, meta = await _invoke_with_meta(
-                    qsar_client.profile_with_profiler, profiler_guid, target_chem_id, None
+                    qsar_client.profile_with_profiler,
+                    profiler_guid,
+                    target_chem_id,
+                    None,
                 )
-                profiler_provenance, profiler_info_entry = await _fetch_profiler_provenance(
-                    profiler_guid, profiler_provenance_cache
+                profiler_provenance, profiler_info_entry = (
+                    await _fetch_profiler_provenance(
+                        profiler_guid, profiler_provenance_cache
+                    )
                 )
                 profiler_result = {
                     "subject_role": "target",
@@ -2877,7 +2958,10 @@ async def build_grouping_justification(
                     profiler_result["profiler_provenance"] = profiler_provenance
                 profiler_results.append(profiler_result)
                 entry = _format_meta(
-                    "profiling/execute", meta, profiler_guid=profiler_guid, chem_id=target_chem_id
+                    "profiling/execute",
+                    meta,
+                    profiler_guid=profiler_guid,
+                    chem_id=target_chem_id,
                 )
                 if entry:
                     toolbox_calls.append(entry)
@@ -2895,7 +2979,9 @@ async def build_grouping_justification(
                     )
                 )
             except QsarClientError as exc:
-                message = f"Profiler {profiler_guid} failed for target {target_name}: {exc}"
+                message = (
+                    f"Profiler {profiler_guid} failed for target {target_name}: {exc}"
+                )
                 log.warning(message)
                 log_bundle["errors"].append(message)
                 evidence_matrix.append(
@@ -2957,14 +3043,21 @@ async def build_grouping_justification(
                 )
 
             for analogue in source_analogues:
-                analogue_name = analogue.get("preferred_name", analogue.get("input_identifier", "Unknown"))
+                analogue_name = analogue.get(
+                    "preferred_name", analogue.get("input_identifier", "Unknown")
+                )
                 analogue_chem_id = analogue.get("chem_id")
                 try:
                     payload, meta = await _invoke_with_meta(
-                        qsar_client.profile_with_profiler, profiler_guid, analogue_chem_id, None
+                        qsar_client.profile_with_profiler,
+                        profiler_guid,
+                        analogue_chem_id,
+                        None,
                     )
-                    profiler_provenance, profiler_info_entry = await _fetch_profiler_provenance(
-                        profiler_guid, profiler_provenance_cache
+                    profiler_provenance, profiler_info_entry = (
+                        await _fetch_profiler_provenance(
+                            profiler_guid, profiler_provenance_cache
+                        )
                     )
                     profiler_result = {
                         "subject_role": "source_analogue",
@@ -3016,10 +3109,14 @@ async def build_grouping_justification(
         for simulator_guid in simulator_guids:
             try:
                 payload, meta = await _invoke_with_meta(
-                    qsar_client.simulate_metabolites_for_chem, simulator_guid, target_chem_id
+                    qsar_client.simulate_metabolites_for_chem,
+                    simulator_guid,
+                    target_chem_id,
                 )
-                simulator_provenance, simulator_info_entry = await _fetch_simulator_provenance(
-                    simulator_guid, simulator_provenance_cache
+                simulator_provenance, simulator_info_entry = (
+                    await _fetch_simulator_provenance(
+                        simulator_guid, simulator_provenance_cache
+                    )
                 )
                 simulator_result = {
                     "subject_role": "target",
@@ -3053,7 +3150,9 @@ async def build_grouping_justification(
                     )
                 )
             except QsarClientError as exc:
-                message = f"Simulator {simulator_guid} failed for target {target_name}: {exc}"
+                message = (
+                    f"Simulator {simulator_guid} failed for target {target_name}: {exc}"
+                )
                 log.warning(message)
                 log_bundle["errors"].append(message)
                 evidence_matrix.append(
@@ -3069,7 +3168,9 @@ async def build_grouping_justification(
                 )
 
             for analogue in source_analogues:
-                analogue_name = analogue.get("preferred_name", analogue.get("input_identifier", "Unknown"))
+                analogue_name = analogue.get(
+                    "preferred_name", analogue.get("input_identifier", "Unknown")
+                )
                 analogue_chem_id = analogue.get("chem_id")
                 try:
                     payload, meta = await _invoke_with_meta(
@@ -3077,8 +3178,10 @@ async def build_grouping_justification(
                         simulator_guid,
                         analogue_chem_id,
                     )
-                    simulator_provenance, simulator_info_entry = await _fetch_simulator_provenance(
-                        simulator_guid, simulator_provenance_cache
+                    simulator_provenance, simulator_info_entry = (
+                        await _fetch_simulator_provenance(
+                            simulator_guid, simulator_provenance_cache
+                        )
                     )
                     simulator_result = {
                         "subject_role": "source_analogue",
@@ -3150,10 +3253,16 @@ async def build_grouping_justification(
                     qsar_result["model_provenance"] = model_provenance
                 qsar_results.append(qsar_result)
                 entry_apply = _format_meta(
-                    "qsar/apply", apply_meta, qsar_guid=qsar_guid, chem_id=target_chem_id
+                    "qsar/apply",
+                    apply_meta,
+                    qsar_guid=qsar_guid,
+                    chem_id=target_chem_id,
                 )
                 entry_domain = _format_meta(
-                    "qsar/domain", domain_meta, qsar_guid=qsar_guid, chem_id=target_chem_id
+                    "qsar/domain",
+                    domain_meta,
+                    qsar_guid=qsar_guid,
+                    chem_id=target_chem_id,
                 )
                 if entry_apply:
                     toolbox_calls.append(entry_apply)
@@ -3173,7 +3282,9 @@ async def build_grouping_justification(
                     )
                 )
             except QsarClientError as exc:
-                message = f"QSAR model {qsar_guid} failed for target {target_name}: {exc}"
+                message = (
+                    f"QSAR model {qsar_guid} failed for target {target_name}: {exc}"
+                )
                 log.warning(message)
                 log_bundle["errors"].append(message)
                 evidence_matrix.append(

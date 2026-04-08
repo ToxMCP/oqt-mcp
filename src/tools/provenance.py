@@ -133,7 +133,9 @@ def build_endpoint_study_record(payload: Any) -> Optional[Dict[str, Any]]:
     if qualifier:
         record["qualifier"] = str(qualifier)
 
-    study = first_present(provenance.get("study"), metadata.get("Test type"), metadata.get("Record ID"))
+    study = first_present(
+        provenance.get("study"), metadata.get("Test type"), metadata.get("Record ID")
+    )
     if study:
         record["study"] = str(study)
 
@@ -229,9 +231,7 @@ def build_provenance(payload: Any) -> Optional[Dict[str, Any]]:
     if authors:
         provenance["authors"] = authors
 
-    owner = _first_present(
-        payload, ["Owner", "Donator", "_donator", "ModelDeveloper"]
-    )
+    owner = _first_present(payload, ["Owner", "Donator", "_donator", "ModelDeveloper"])
     if owner:
         provenance["owner"] = owner
 
@@ -294,7 +294,12 @@ def build_provenance_collection(payload: Any) -> list[Dict[str, Any]]:
         provenance = build_provenance(candidate)
         if not provenance:
             continue
-        key = tuple(sorted((str(item_key), str(item_value)) for item_key, item_value in provenance.items()))
+        key = tuple(
+            sorted(
+                (str(item_key), str(item_value))
+                for item_key, item_value in provenance.items()
+            )
+        )
         if key in seen:
             continue
         seen.add(key)

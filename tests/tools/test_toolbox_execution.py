@@ -4,11 +4,10 @@ import io
 import json
 from pathlib import Path
 
-import pytest
 import jsonschema
+import pytest
 
 from src.tools.implementations import toolbox_execution as execution
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -115,7 +114,7 @@ def test_build_portable_handoffs_from_workflow_log():
                     "Value": "1.23",
                     "Unit": "mg/L",
                     "Endpoint": "LC50",
-                    "DomainResult": "InDomain"
+                    "DomainResult": "InDomain",
                 },
                 "domain": "InDomain",
             }
@@ -137,10 +136,25 @@ def test_build_portable_handoffs_from_workflow_log():
     )
     assert workflow_record["packageSemantics"]["mode"] == "working_bundle"
     assert workflow_record["attachments"]
-    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["requestMetadata"]["requestedQsarModels"] == ["qsar-1"]
-    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["endpointSummaries"][0]["endpoint"] == "LC50"
-    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["decisionOwner"] == "downstream_expert_review"
-    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["uncertaintyAssessment"]["semanticCoverage"]["overallQuantificationStatus"] == "qualitative_only"
+    assert result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"][
+        "requestMetadata"
+    ]["requestedQsarModels"] == ["qsar-1"]
+    assert (
+        result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["endpointSummaries"][
+            0
+        ]["endpoint"]
+        == "LC50"
+    )
+    assert (
+        result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"]["decisionOwner"]
+        == "downstream_expert_review"
+    )
+    assert (
+        result["portable_handoffs"]["oqtHazardEvidenceSummary.v1"][
+            "uncertaintyAssessment"
+        ]["semanticCoverage"]["overallQuantificationStatus"]
+        == "qualitative_only"
+    )
 
 
 def test_build_portable_handoffs_from_grouping_log():
