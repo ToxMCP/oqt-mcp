@@ -17,7 +17,7 @@ O-QT MCP does not own:
 - Suite-wide orchestration across CompTox, AOP, PBPK, or future modules.
 - Final BER/WoE synthesis or decision logic.
 - Cross-domain semantics that properly belong to other MCPs.
-- Async queueing or persistence infrastructure in v0.2.0.
+- Async queueing or persistence infrastructure in v0.3.0.
 
 ## Public surface
 
@@ -63,4 +63,4 @@ The current deployment model is synchronous and suited to controlled environment
 - Reverse-proxy TLS termination and OIDC/RBAC in production.
 - Direct connectivity to a licensed OECD QSAR Toolbox WebAPI instance.
 
-An async job queue and persistence layer remain roadmap work, not part of the v0.2.0 contract.
+An async job queue and persistence layer remain roadmap work, not part of the v0.3.0 contract.

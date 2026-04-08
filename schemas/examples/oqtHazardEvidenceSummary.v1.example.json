@@ -356,7 +356,7 @@
   "provenance": {
     "workflowId": "oqthzd-benzene-20260408-0001",
     "sourceSystem": "OECD QSAR Toolbox WebAPI",
-    "generatedBy": "O-QT MCP Server v0.2.0",
+    "generatedBy": "O-QT MCP Server v0.3.0",
     "generatedAt": "2026-04-08T10:30:00Z",
     "references": [
       "https://github.com/ToxMCP/oqt-mcp"

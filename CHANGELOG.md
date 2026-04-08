@@ -18,6 +18,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-04-08
+
+### Added
+- Machine-readable boundary and ownership fields in the portable hazard and read-across contracts: `assessmentBoundary`, `decisionBoundary`, `decisionOwner`, `supports`, and `requiredExternalInputs`.
+- `semanticCoverage` in the portable hazard uncertainty block to make the qualitative-only uncertainty semantics explicit.
+- Live Toolbox smoke coverage for hazard analysis, workflow handoffs, grouping dossiers, log replay, and direct execution helpers.
+- Configurable wall-clock safeguards for slow hazard-profiling and discovery-heavy Toolbox paths.
+
+### Changed
+- Bumped package metadata and runtime version markers to `0.3.0`.
+- Updated the public README, architecture notes, and release docs to match the current contract layer and live-validation surface.
+- Refined normalized provenance packaging so endpoint study records, endpoint summaries, evidence blocks, and source-call metadata remain easier to audit downstream.
+
+### Fixed
+- Removed stale public-doc references to still-private local module names.
+- Eliminated version drift between package metadata, runtime fallbacks, and example payloads.
+
+---
+
 ## [0.2.0] - 2026-03-23
 
 ### Added
@@ -41,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile and docker-compose stack for local development with Toolbox API stub.
 - Taskmaster backlog, documentation set (`docs/auth_testing.md`, `docs/observability.md`, `docs/testing.md`), and CI workflow skeleton.
 
-[Unreleased]: https://github.com/ToxMCP/oqt-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ToxMCP/oqt-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.1.0

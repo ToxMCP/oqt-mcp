@@ -1,6 +1,6 @@
 [project]
 name = "o-qt-mcp-server"
-version = "0.2.0"
+version = "0.3.0"
 description = "Specialized MCP workflow engine for the OECD QSAR Toolbox inside the ToxMCP suite"
 readme = "README.md"
 license = "Apache-2.0"

@@ -7,7 +7,6 @@ This note records the local cross-suite contract review used to harden O-QT MCP 
 - `AOP_MCP`
 - `comptox_mcp_clean_3568d68`
 - `PBPK_MCP`
-- `Bioactivity-PoD-MCP`
 
 ## Patterns adopted into O-QT MCP
 
@@ -29,7 +28,7 @@ This note records the local cross-suite contract review used to harden O-QT MCP 
 - Explicit `supports` and `requiredExternalInputs` fields so downstream consumers can tell what the module does and does not claim to decide.
 - Stronger uncertainty framing that distinguishes semantic coverage from quantitative confidence.
 
-### From Bioactivity-PoD MCP
+### From other contract-first modules
 
 - Explicit `decisionOwner` language so handoff objects make ownership boundaries visible.
 - Contract emphasis on fit-for-purpose review rather than implied finality.
@@ -57,5 +56,5 @@ This note records the local cross-suite contract review used to harden O-QT MCP 
 - AOP draft-authoring semantics, because O-QT is not an authoring server.
 - CompTox-style numeric applicability-domain confidence, because O-QT does not currently produce a scientifically defensible quantitative AD confidence estimate.
 - PBPK qualification or model-trust governance objects, because O-QT should stay focused on OECD QSAR Toolbox evidence packaging rather than model-qualification workflow management.
-- Bioactivity point-of-departure decision objects, because O-QT should not claim ownership of final biological interpretation outside its module scope.
+- Point-of-departure decision objects, because O-QT should not claim ownership of final biological interpretation outside its module scope.
 - Suite-level evidence synthesis, because O-QT should remain a module-scoped OECD QSAR Toolbox engine.

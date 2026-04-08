@@ -27,13 +27,13 @@ This guide describes how to cut releases for the O-QT MCP server, including sema
 
 ## Publishing a Release
 
-1. Decide the new version (for example `v0.2.0`) and update `pyproject.toml` accordingly.
+1. Decide the new version (for example `v0.3.0`) and update `pyproject.toml` accordingly.
 2. Move entries from `## [Unreleased]` in `CHANGELOG.md` into a new section `## [x.y.z] - YYYY-MM-DD`.
-3. Commit changes with a message such as `chore: prepare v0.2.0 release`.
+3. Commit changes with a message such as `chore: prepare v0.3.0 release`.
 4. Tag the commit:
    ```bash
-   git tag -a v0.2.0 -m "O-QT MCP Server v0.2.0"
-   git push origin v0.2.0
+   git tag -a v0.3.0 -m "O-QT MCP Server v0.3.0"
+   git push origin v0.3.0
    ```
 5. Create a GitHub release for the new tag, pasting the changelog entry. Include links to `README.md`, `docs/architecture.md`, and `schemas/README.md` so downstream consumers can see the updated contract surface immediately.
 

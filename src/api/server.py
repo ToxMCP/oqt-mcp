@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 try:
     _app_version = metadata.version("o-qt-mcp-server")
 except metadata.PackageNotFoundError:
-    _app_version = "0.2.0"
+    _app_version = "0.3.0"
 
 
 @asynccontextmanager

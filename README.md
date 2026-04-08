@@ -64,18 +64,18 @@ The current implementation follows a layered model:
 
 See [docs/architecture.md](docs/architecture.md) for the fuller boundary and contract notes.
 See [docs/oecd_alignment_review_2025.md](docs/oecd_alignment_review_2025.md) for the OECD 2025 grouping/IUCLID gap analysis and the next contract-focused improvements.
-See [docs/cross_suite_alignment_2026.md](docs/cross_suite_alignment_2026.md) for the local AOP/CompTox contract patterns adopted into O-QT.
+See [docs/cross_suite_alignment_2026.md](docs/cross_suite_alignment_2026.md) for the public contract patterns adopted into O-QT.
 
-## What's New In v0.2.0
+## What's New In v0.3.0
 
-This is a maturity and contract release, not a redesign.
+This is a contract-hardening and validation release, not a redesign.
 
-- Re-aligned repository identity, package metadata, and release notes around `ToxMCP/oqt-mcp`.
-- Clarified the public surface as a primary workflow engine plus secondary expert tools.
-- Published portable O-QT handoff schemas for hazard evidence, read-across support, and workflow provenance.
-- Hardened the hazard handoff with explicit evidence blocks, applicability-domain review, and richer provenance records for audit-grade downstream review.
-- Added explicit downstream-orchestration documentation and examples for contract consumers.
-- Documented the current synchronous deployment model instead of implying an async platform that does not exist yet.
+- Bumped the public package and runtime version to `0.3.0`.
+- Hardened `oqtHazardEvidenceSummary.v1` and `oqtReadAcrossSummary.v1` with machine-readable `assessmentBoundary`, `decisionBoundary`, `decisionOwner`, `supports`, and `requiredExternalInputs`.
+- Added `semanticCoverage` to the hazard uncertainty contract so the MCP states explicitly that O-QT uncertainty is qualitative evidence packaging, not probabilistic confidence.
+- Expanded normalized provenance and study packaging so hazard outputs can carry endpoint study records, endpoint summaries, evidence blocks, and source-call metadata in a more audit-ready shape.
+- Added configurable wall-clock safeguards and a live smoke suite for the Toolbox-backed surface, including hazard analysis, workflow handoffs, grouping dossiers, and log replay.
+- Refreshed the public docs so the README, schemas, and release notes reflect the current contract surface without referencing still-private modules.
 
 ## Published Schemas
 
@@ -129,7 +129,7 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 ## Table of contents
 
 1. [Architecture](#architecture)
-2. [What's New In v0.2.0](#whats-new-in-v020)
+2. [What's New In v0.3.0](#whats-new-in-v030)
 3. [Published Schemas](#published-schemas)
 4. [Quick start](#quick-start)
 5. [Related resources](#related-resources)
@@ -468,8 +468,8 @@ Update `.env` to point at a real Toolbox instance before production use.
 | Profile | Shape | Suitable for | Notes |
 | --- | --- | --- | --- |
 | `local-dev` | Single FastAPI process, optional auth bypass | Workstation development, smoke tests, prompt-driven debugging | Calls the Toolbox WebAPI synchronously. |
-| `controlled-prod` | FastAPI behind TLS reverse proxy with OIDC, RBAC, and audit shipping | Internal deployments and orchestrated suite flows | Still synchronous in v0.2.0; scale with worker policy and operational guardrails rather than a built-in queue. |
-| `not-in-v0.2.0` | Async queue and persistence layer | Detached batch jobs and large-scale job replay | Remains roadmap work. |
+| `controlled-prod` | FastAPI behind TLS reverse proxy with OIDC, RBAC, and audit shipping | Internal deployments and orchestrated suite flows | Still synchronous in v0.3.0; scale with worker policy and operational guardrails rather than a built-in queue. |
+| `not-in-v0.3.0` | Async queue and persistence layer | Detached batch jobs and large-scale job replay | Remains roadmap work. |
 
 This release intentionally tightens the deployment story instead of over-claiming platform maturity.
 

@@ -117,7 +117,7 @@
   },
   "provenance": {
     "sourceSystem": "OECD QSAR Toolbox WebAPI",
-    "generatedBy": "O-QT MCP Server v0.2.0",
+    "generatedBy": "O-QT MCP Server v0.3.0",
     "generatedAt": "2026-03-23T09:30:00Z",
     "repository": "https://github.com/ToxMCP/oqt-mcp",
     "toolboxCompatibility": "v6 compatibility routes enabled",
