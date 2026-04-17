@@ -9,9 +9,15 @@ from src.utils.privacy import scrub_value
 
 # Patterns that indicate sensitive data in free-text log messages
 _SENSITIVE_PATTERNS = [
-    (re.compile(r"SMILES:\s*([A-Za-z0-9=@+\-\[\]\\\(\)/#.]+)", re.IGNORECASE), "SMILES: [HASHED]"),
+    (
+        re.compile(r"SMILES:\s*([A-Za-z0-9=@+\-\[\]\\\(\)/#.]+)", re.IGNORECASE),
+        "SMILES: [HASHED]",
+    ),
     (re.compile(r"CAS\s*:?\s*(\d{1,7}-\d{2}-\d)", re.IGNORECASE), "CAS: [HASHED]"),
-    (re.compile(r"chemical_name[=:]\s*([^,\s]+)", re.IGNORECASE), "chemical_name=[HASHED]"),
+    (
+        re.compile(r"chemical_name[=:]\s*([^,\s]+)", re.IGNORECASE),
+        "chemical_name=[HASHED]",
+    ),
     # Scrub SMILES/CAS from URLs in httpx logs
     (re.compile(r"([?&]smiles=)[^\s\"']+", re.IGNORECASE), r"\1[HASHED]"),
     (re.compile(r"([?&]cas=)[^\s\"']+", re.IGNORECASE), r"\1[HASHED]"),

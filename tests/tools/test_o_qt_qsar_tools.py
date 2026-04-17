@@ -93,9 +93,7 @@ def test_run_qsar_prediction_ad_warning_out_of_domain(monkeypatch):
     monkeypatch.setattr(
         qsar_tools.qsar_client, "apply_qsar_model", fake_apply_qsar_model
     )
-    monkeypatch.setattr(
-        qsar_tools.qsar_client, "get_qsar_domain", fake_get_qsar_domain
-    )
+    monkeypatch.setattr(qsar_tools.qsar_client, "get_qsar_domain", fake_get_qsar_domain)
     monkeypatch.setattr(
         qsar_tools.qsar_client, "get_model_metadata", fake_model_metadata
     )

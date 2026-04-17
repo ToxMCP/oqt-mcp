@@ -4,7 +4,6 @@ import hashlib
 import re
 from typing import Any
 
-
 # SMILES heuristic: typical SMILES characters
 _SMILES_CHARS = set("CNO[]()=@+-#$.1234567890BSIPFclbr/\\")
 # CAS number pattern

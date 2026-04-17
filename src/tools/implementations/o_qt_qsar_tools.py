@@ -381,7 +381,9 @@ async def run_qsar_prediction(smiles: str, model_id: str) -> dict:
         domain_value = domain.get("DomainResult") or domain.get("Domain") or ""
     elif isinstance(domain, str):
         domain_value = domain
-    domain_normalized = str(domain_value).strip().replace(" ", "").replace("-", "").lower()
+    domain_normalized = (
+        str(domain_value).strip().replace(" ", "").replace("-", "").lower()
+    )
     ad_warning = domain_normalized in {"outofdomain", "out_of_domain"}
 
     result = {
@@ -389,7 +391,16 @@ async def run_qsar_prediction(smiles: str, model_id: str) -> dict:
         "model_id": model_id,
         "prediction": prediction,
         "domain": domain,
-        "ad_status": "out_of_domain" if ad_warning else ("in_domain" if domain_normalized in {"indomain", "in_domain", "insideapplicabilitydomain"} else "unknown"),
+        "ad_status": (
+            "out_of_domain"
+            if ad_warning
+            else (
+                "in_domain"
+                if domain_normalized
+                in {"indomain", "in_domain", "insideapplicabilitydomain"}
+                else "unknown"
+            )
+        ),
         "ad_warning": ad_warning,
     }
     if ad_warning:

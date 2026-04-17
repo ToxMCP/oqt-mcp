@@ -99,6 +99,7 @@ async def add_security_headers(request: Request, call_next):
 @app.middleware("http")
 async def audit_log_middleware(request: Request, call_next):
     from urllib.parse import parse_qs
+
     from src.utils.privacy import scrub_dict, scrub_value
 
     correlation_id = str(uuid.uuid4())

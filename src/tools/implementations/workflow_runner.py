@@ -2196,13 +2196,15 @@ async def run_oqt_multiagent_workflow(
                 "qsar_guid": qsar_guid,
                 "prediction": prediction,
                 "domain": domain,
-                "ad_status": "out_of_domain"
-                if ad_warning
-                else (
-                    "in_domain"
-                    if domain_normalized
-                    in {"indomain", "in_domain", "insideapplicabilitydomain"}
-                    else "unknown"
+                "ad_status": (
+                    "out_of_domain"
+                    if ad_warning
+                    else (
+                        "in_domain"
+                        if domain_normalized
+                        in {"indomain", "in_domain", "insideapplicabilitydomain"}
+                        else "unknown"
+                    )
                 ),
                 "ad_warning": ad_warning,
             }
@@ -2394,7 +2396,9 @@ def _build_review_required_response(
     pending_checkpoints: List[Any],
 ) -> Dict[str, Any]:
     summary_markdown = "\n".join(
-        ["## QSAR Workflow Summary", ""] + summary_lines + ["", "*Workflow paused for human review.*"]
+        ["## QSAR Workflow Summary", ""]
+        + summary_lines
+        + ["", "*Workflow paused for human review.*"]
     )
     log_bundle["final_report"] = summary_markdown
     response = {
@@ -2442,7 +2446,9 @@ def _build_workflow_response(
 
     qsar_results = log_bundle.get("qsar_results") or []
     qsar_guids_executed = [
-        r["qsar_guid"] for r in qsar_results if isinstance(r, dict) and r.get("qsar_guid")
+        r["qsar_guid"]
+        for r in qsar_results
+        if isinstance(r, dict) and r.get("qsar_guid")
     ]
 
     response = {
@@ -3562,7 +3568,9 @@ async def build_grouping_justification(
 
 
 class ApproveCheckpointParams(BaseModel):
-    checkpoint_id: str = Field(..., description="The checkpoint ID to approve or reject.")
+    checkpoint_id: str = Field(
+        ..., description="The checkpoint ID to approve or reject."
+    )
     decision: str = Field(
         "approved",
         description="Decision for this checkpoint: `approved` or `rejected`.",

@@ -79,8 +79,14 @@ class ReviewOrchestrator:
     ) -> ReviewCheckpoint:
         checkpoint = ReviewCheckpoint(workflow_id, step, data, expires_minutes)
         self._checkpoints[checkpoint.checkpoint_id] = checkpoint
-        self._workflow_index.setdefault(workflow_id, []).append(checkpoint.checkpoint_id)
-        log.info("Created review checkpoint %s for workflow %s", checkpoint.checkpoint_id, workflow_id)
+        self._workflow_index.setdefault(workflow_id, []).append(
+            checkpoint.checkpoint_id
+        )
+        log.info(
+            "Created review checkpoint %s for workflow %s",
+            checkpoint.checkpoint_id,
+            workflow_id,
+        )
         return checkpoint
 
     def _raw_workflow_checkpoints(self, workflow_id: str) -> List[ReviewCheckpoint]:
@@ -95,7 +101,9 @@ class ReviewOrchestrator:
                 cp.status = ReviewDecision.EXPIRED
                 cp.comments = "Checkpoint expired before review."
                 cp.reviewed_at = datetime.now(timezone.utc).isoformat()
-                log.warning("Checkpoint %s expired and was auto-rejected.", cp.checkpoint_id)
+                log.warning(
+                    "Checkpoint %s expired and was auto-rejected.", cp.checkpoint_id
+                )
 
     def get_checkpoint(self, checkpoint_id: str) -> Optional[ReviewCheckpoint]:
         cp = self._checkpoints.get(checkpoint_id)
@@ -148,9 +156,15 @@ class ReviewOrchestrator:
 
     def pending_checkpoints(self, workflow_id: str) -> List[ReviewCheckpoint]:
         self._enforce_expiry(workflow_id)
-        return [c for c in self.get_workflow_checkpoints(workflow_id) if c.status == ReviewDecision.PENDING]
+        return [
+            c
+            for c in self.get_workflow_checkpoints(workflow_id)
+            if c.status == ReviewDecision.PENDING
+        ]
 
-    def get_checkpoint_by_step(self, workflow_id: str, step: str) -> Optional[ReviewCheckpoint]:
+    def get_checkpoint_by_step(
+        self, workflow_id: str, step: str
+    ) -> Optional[ReviewCheckpoint]:
         for cp in self.get_workflow_checkpoints(workflow_id):
             if cp.step == step:
                 return cp

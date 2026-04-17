@@ -89,7 +89,11 @@ def generate_pdf_report(log_data: dict) -> BytesIO:
 
     # Build AD warnings from qsar_results (OQT-03)
     warnings: list[str] = []
-    qsar_results = log_data.get("qsar_results", []) if isinstance(log_data.get("qsar_results"), list) else []
+    qsar_results = (
+        log_data.get("qsar_results", [])
+        if isinstance(log_data.get("qsar_results"), list)
+        else []
+    )
     for item in qsar_results:
         if isinstance(item, dict):
             domain = item.get("domain")
@@ -97,11 +101,12 @@ def generate_pdf_report(log_data: dict) -> BytesIO:
                 domain_val = domain.get("DomainResult") or domain.get("Domain") or ""
             else:
                 domain_val = str(domain) if domain else ""
-            if domain_val and str(domain_val).lower() in {"outofdomain", "out of domain"}:
+            if domain_val and str(domain_val).lower() in {
+                "outofdomain",
+                "out of domain",
+            }:
                 model = item.get("qsar_guid") or item.get("model_id") or "Unknown model"
-                warnings.append(
-                    f"Model {model} predicted OUT OF APPLICABILITY DOMAIN."
-                )
+                warnings.append(f"Model {model} predicted OUT OF APPLICABILITY DOMAIN.")
     if warnings:
         warnings.append(
             "Treat these predictions with caution and consider experimental validation."
