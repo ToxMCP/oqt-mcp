@@ -66,6 +66,17 @@ See [docs/architecture.md](docs/architecture.md) for the fuller boundary and con
 See [docs/oecd_alignment_review_2025.md](docs/oecd_alignment_review_2025.md) for the OECD 2025 grouping/IUCLID gap analysis and the next contract-focused improvements.
 See [docs/cross_suite_alignment_2026.md](docs/cross_suite_alignment_2026.md) for the public contract patterns adopted into O-QT.
 
+## What's New In v0.3.1
+
+This release focuses on audit remediation and scientific governance controls.
+
+- **Human review checkpoints** — `run_oqt_multiagent_workflow` now supports `require_human_review=true` to pause at `chemical_identity`, `ad_assessment`, and `final_report` checkpoints before generating artifacts.
+- **AD hard gating** — Out-of-domain QSAR predictions block PDF generation when review mode is enabled.
+- **Privacy-aware logging** — SMILES, CAS numbers, chemical names, and API keys are automatically hashed in audit logs and `httpx` URL traces.
+- **LLM prompt sanitization** — Untrusted identifiers are scrubbed of control characters and formatting symbols before entering LLM-facing contexts.
+- **PDF provenance** — Fallback PDF reports now include a disclaimer header, applicability-domain warnings, and a provenance summary.
+- **Safer search defaults** — `search_type` now defaults to `"name"` instead of `"auto"`.
+
 ## What's New In v0.3.0
 
 This is a contract-hardening and validation release, not a redesign.
@@ -129,23 +140,25 @@ The O-QT MCP server turns that workflow into an **open, programmable interface**
 ## Table of contents
 
 1. [Architecture](#architecture)
-2. [What's New In v0.3.0](#whats-new-in-v030)
-3. [Published Schemas](#published-schemas)
-4. [Quick start](#quick-start)
-5. [Related resources](#related-resources)
-6. [Configuration](#configuration)
-7. [Public surface model](#public-surface-model)
-8. [Tool catalog](#tool-catalog)
-9. [Running the server](#running-the-server)
-10. [Deployment modes](#deployment-modes)
-11. [Integrating with coding agents](#integrating-with-coding-agents)
-12. [Downstream orchestration](#downstream-orchestration)
-13. [Output artifacts](#output-artifacts)
-14. [Security checklist](#security-checklist)
-15. [Current limitations](#current-limitations)
-16. [Development notes](#development-notes)
-17. [Roadmap](#roadmap)
-18. [License](#license)
+2. [What's New In v0.3.1](#whats-new-in-v031)
+3. [What's New In v0.3.0](#whats-new-in-v030)
+4. [Published Schemas](#published-schemas)
+5. [Quick start](#quick-start)
+6. [Related resources](#related-resources)
+7. [Configuration](#configuration)
+8. [Public surface model](#public-surface-model)
+9. [Tool catalog](#tool-catalog)
+10. [Running the server](#running-the-server)
+11. [Deployment modes](#deployment-modes)
+12. [Integrating with coding agents](#integrating-with-coding-agents)
+13. [Downstream orchestration](#downstream-orchestration)
+14. [Output artifacts](#output-artifacts)
+15. [Human review checkpoints](#human-review-checkpoints)
+16. [Security checklist](#security-checklist)
+17. [Current limitations](#current-limitations)
+18. [Development notes](#development-notes)
+19. [Roadmap](#roadmap)
+20. [License](#license)
 
 ---
 
