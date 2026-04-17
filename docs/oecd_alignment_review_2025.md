@@ -1,5 +1,7 @@
 # OECD 2025 Guidance Review for O-QT MCP
 
+> **Update (v0.3.1, April 2026):** Several governance and safety controls recommended in this review have been partially implemented in v0.3.1, including explicit applicability-domain gating (`ad_status`, `ad_warning`, `ad_recommendation`), human review checkpoints (`require_human_review`), and privacy-aware logging. The longer-term contract and schema extensions described below (attachment manifests, data-matrix contracts, endpoint-summary exports) remain on the roadmap.
+
 Reviewed sources:
 
 - `Guidance on Grouping of Chemicals, Third Edition` (OECD, 2025), DOI `10.1787/b254a158-en`
@@ -274,6 +276,8 @@ Goal:
 - make the current `data_matrix` portable and stable enough for downstream ingestion
 
 ### PR 3. Add applicability-domain and boundary semantics
+
+> **Partially implemented in v0.3.1.** `run_qsar_prediction` now returns `ad_status`, `ad_warning`, and `ad_recommendation`, and `run_oqt_multiagent_workflow` supports `require_human_review=true` to pause workflow execution when predictions are out-of-domain. The remaining work is to expose full inclusion/exclusion rules and boundary notes in the grouping/read-across handoff contract.
 
 Files likely affected:
 
