@@ -74,6 +74,38 @@ def test_run_qsar_prediction(monkeypatch):
     assert result["model_provenance"]["owner"] == "EPA"
 
 
+def test_run_qsar_prediction_ad_warning_out_of_domain(monkeypatch):
+    async def fake_search_chemicals(smiles: str, search_type: str):
+        return [{"ChemId": "chem-123"}]
+
+    async def fake_apply_qsar_model(model_id: str, chem_id: str):
+        return {"Value": 0.5}
+
+    async def fake_get_qsar_domain(model_id: str, chem_id: str):
+        return "OutOfDomain"
+
+    async def fake_model_metadata(model_id: str):
+        return {"Guid": model_id, "Name": "Test model", "Donator": "EPA"}
+
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "search_chemicals", fake_search_chemicals
+    )
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "apply_qsar_model", fake_apply_qsar_model
+    )
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "get_qsar_domain", fake_get_qsar_domain
+    )
+    monkeypatch.setattr(
+        qsar_tools.qsar_client, "get_model_metadata", fake_model_metadata
+    )
+
+    result = asyncio.run(qsar_tools.run_qsar_prediction("CCO", "model-123"))
+    assert result["ad_status"] == "out_of_domain"
+    assert result["ad_warning"] is True
+    assert "ad_recommendation" in result
+
+
 def test_analyze_chemical_hazard(monkeypatch):
     calls: dict[str, tuple | None] = {}
 

@@ -142,6 +142,8 @@ class QsarClient:
                             "last_attempt_ms": round(elapsed_attempt, 3),
                             "timeout_profile": profile,
                             "status_code": response.status_code,
+                            "api_versions": response.headers.get("api-supported-versions"),
+                            "server_date": response.headers.get("date"),
                         }
                         return data, meta
 

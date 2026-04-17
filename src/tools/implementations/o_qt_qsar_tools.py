@@ -63,7 +63,7 @@ class ChemicalSearchParams(BaseModel):
         ..., description="The search term (Name, CAS number, or SMILES)."
     )
     search_type: str = Field(
-        "auto", description="Type of search (e.g., 'auto', 'name', 'cas', 'smiles')."
+        "name", description="Type of search (e.g., 'auto', 'name', 'cas', 'smiles')."
     )
 
 
@@ -375,13 +375,28 @@ async def run_qsar_prediction(smiles: str, model_id: str) -> dict:
         )
         return _attach_toolbox(result, toolbox_meta)
 
+    # Light-weight applicability-domain gating (OQT-01)
+    domain_value = ""
+    if isinstance(domain, dict):
+        domain_value = domain.get("DomainResult") or domain.get("Domain") or ""
+    elif isinstance(domain, str):
+        domain_value = domain
+    domain_normalized = str(domain_value).strip().replace(" ", "").replace("-", "").lower()
+    ad_warning = domain_normalized in {"outofdomain", "out_of_domain"}
+
     result = {
         "chem_id": chem_id,
         "model_id": model_id,
         "prediction": prediction,
         "domain": domain,
-        "search_hits": hits,
+        "ad_status": "out_of_domain" if ad_warning else ("in_domain" if domain_normalized in {"indomain", "in_domain", "insideapplicabilitydomain"} else "unknown"),
+        "ad_warning": ad_warning,
     }
+    if ad_warning:
+        result["ad_recommendation"] = (
+            "This prediction is outside the model's applicability domain. "
+            "Treat with caution and consider experimental validation or read-across."
+        )
     if model_provenance:
         result["model_provenance"] = model_provenance
     toolbox_meta = _aggregate_meta(

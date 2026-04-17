@@ -98,16 +98,29 @@ async def add_security_headers(request: Request, call_next):
 # Placeholder: In production, this must log to a centralized, tamper-evident system.
 @app.middleware("http")
 async def audit_log_middleware(request: Request, call_next):
+    from urllib.parse import parse_qs
+    from src.utils.privacy import scrub_dict, scrub_value
+
     correlation_id = str(uuid.uuid4())
     request.state.correlation_id = correlation_id
     start = time.perf_counter()
+
+    # Scrub potentially sensitive path segments (e.g., SMILES in URL paths)
+    scrubbed_path = scrub_value("path", request.url.path)
+    query_str = str(request.url.query) if request.url.query else ""
+    # Parse query string into a dict so keys remain readable and only values are scrubbed
+    if query_str:
+        parsed_query = parse_qs(query_str, keep_blank_values=True)
+        scrubbed_query = scrub_dict(parsed_query)
+    else:
+        scrubbed_query = {}
 
     log.debug(
         "Incoming request",
         extra={
             "cid": correlation_id,
             "method": request.method,
-            "path": request.url.path,
+            "path": scrubbed_path,
         },
     )
 
@@ -120,10 +133,12 @@ async def audit_log_middleware(request: Request, call_next):
         "correlation_id": correlation_id,
         "user_id": user_id,
         "method": request.method,
-        "path": request.url.path,
+        "path": scrubbed_path,
         "status_code": response.status_code,
         "duration_ms": round(duration_ms, 3),
     }
+    if scrubbed_query:
+        event["query"] = scrubbed_query
     audit.emit(event)
 
     response.headers["X-Request-ID"] = correlation_id

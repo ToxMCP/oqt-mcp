@@ -40,6 +40,28 @@ def test_run_qsar_model(monkeypatch):
     assert result["model_provenance"]["owner"] == "EPA"
 
 
+def test_run_qsar_model_ad_warning(monkeypatch):
+    async def fake_apply(qsar_guid, chem_id):
+        return {"Value": 0.5}
+
+    async def fake_domain(qsar_guid, chem_id):
+        return "OutOfDomain"
+
+    async def fake_model_metadata(qsar_guid):
+        return {"Guid": qsar_guid, "Name": "Test model", "Donator": "EPA"}
+
+    monkeypatch.setattr(execution.qsar_client, "apply_qsar_model", fake_apply)
+    monkeypatch.setattr(execution.qsar_client, "get_qsar_domain", fake_domain)
+    monkeypatch.setattr(
+        execution.qsar_client, "get_model_metadata", fake_model_metadata
+    )
+
+    result = asyncio.run(execution.run_qsar_model("model", "chem"))
+    assert result["ad_status"] == "out_of_domain"
+    assert result["ad_warning"] is True
+    assert "ad_recommendation" in result
+
+
 def test_run_metabolism_simulator(monkeypatch):
     async def fake_sim(simulator_guid, chem_id):
         return ["metabolite"]
@@ -86,6 +108,28 @@ def test_render_pdf_from_log(monkeypatch):
     assert result["size_bytes"] == len(b"%PDF-1.4\n")
     decoded = base64.b64decode(result["pdf_base64"])
     assert decoded == b"%PDF-1.4\n"
+
+
+def test_generate_pdf_report_includes_disclaimer_and_ad_warnings():
+    log = {
+        "identifier": "test-chem",
+        "final_report": "Test summary",
+        "inputs": {"identifier": "test-chem"},
+        "generated_by": "O-QT MCP Server",
+        "qsar_results": [
+            {"qsar_guid": "model-1", "domain": {"DomainResult": "OutOfDomain"}},
+            {"qsar_guid": "model-2", "domain": {"DomainResult": "InDomain"}},
+        ],
+    }
+    from src.utils.pdf_generator import generate_pdf_report
+
+    pdf_buffer = generate_pdf_report(log)
+    pdf_bytes = pdf_buffer.getvalue()
+    text = pdf_bytes.decode("latin-1", errors="ignore")
+    assert "DISCLAIMER" in text
+    assert "APPLICABILITY DOMAIN WARNINGS" in text
+    assert "OUT OF APPLICABILITY DOMAIN" in text
+    assert "PROVENANCE" in text
 
 
 def test_build_portable_handoffs_from_workflow_log():

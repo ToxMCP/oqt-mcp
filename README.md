@@ -271,6 +271,9 @@ See [docs/auth_testing.md](docs/auth_testing.md) for token generation tips and b
 | `llm_provider` | string | – | Override LLM provider (e.g., `openai`, `openrouter`). |
 | `llm_model` | string | – | LLM model identifier. |
 | `llm_api_key` | string | – | API key when not provided via environment. |
+| `require_human_review` | boolean | – | When `true`, high-risk checkpoints require explicit approval before artifacts are generated. |
+| `workflow_id` | string | – | Optional workflow ID for resuming a review-paused workflow. |
+| `checkpoint_approvals` | array[{checkpoint_id, decision, comments}] | – | Pre-approved checkpoints to resume a paused workflow. |
 
 ### `build_grouping_justification` parameters
 
@@ -526,12 +529,53 @@ Portable cross-suite contract files are versioned separately under `schemas/`.
 
 ---
 
+## Human review checkpoints
+
+For scientific governance, `run_oqt_multiagent_workflow` supports an optional `require_human_review=true` mode that pauses the workflow at high-risk decision points instead of auto-generating artifacts.
+
+### Checkpoints created
+1. **`chemical_identity`** — After resolving the input identifier to a Toolbox record.
+2. **`ad_assessment`** — When any QSAR prediction reports `ad_warning=true` (out of applicability domain).
+3. **`final_report`** — Before generating the PDF artifact.
+
+### Workflow behavior
+- If no checkpoints are triggered, the workflow completes normally (`status: "ok"`).
+- If checkpoints are pending, the workflow returns:
+  - `status: "review_required"`
+  - `workflow_id` — ID to use when resuming
+  - `review_checkpoints` — List of pending checkpoints with metadata
+  - **No PDF is generated.**
+
+### Approving or rejecting checkpoints
+Use the `approve_workflow_checkpoint` tool:
+
+```json
+{
+  "name": "approve_workflow_checkpoint",
+  "arguments": {
+    "checkpoint_id": "<checkpoint-id>",
+    "decision": "approved",
+    "comments": "Looks correct"
+  }
+}
+```
+
+Decisions: `approved` | `rejected`
+
+### Resuming the workflow
+Pass the same `workflow_id` back to `run_oqt_multiagent_workflow` (with `require_human_review=true`). The server will detect approved checkpoints and complete the workflow, returning `status: "ok"` and the PDF.
+
+> **Note:** Checkpoint state is held in memory. If the server restarts, pending checkpoints are lost. Do not use this feature for long-lived review cycles without external persistence.
+
+---
+
 ## Security checklist
 
 - ✅ Use OAuth2/OIDC in production (`BYPASS_AUTH=false`).
 - ✅ Terminate TLS at a reverse proxy.
 - ✅ Configure RBAC in `config/tool_permissions.default.json`.
 - ✅ Enable audit log shipping (see [docs/observability.md](docs/observability.md)).
+- ✅ Turn on `require_human_review=true` for high-stakes workflows to enforce explicit checkpoint approval.
 - ✅ Rotate secrets via platform-specific secret stores.
 - ✅ Regularly update the Docker base image (see [Dockerfile](Dockerfile)).
 

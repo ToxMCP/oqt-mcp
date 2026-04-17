@@ -34,6 +34,7 @@ from src.tools.hazard_contracts import (
 from src.tools.provenance import build_provenance
 from src.tools.registry import tool_registry
 from src.utils.pdf_generator import generate_pdf_report
+from src.utils.review import ReviewDecision, review_orchestrator
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ class WorkflowParams(BaseModel):
         ..., description="Chemical identifier (common name, CAS number, or SMILES)."
     )
     search_type: str = Field(
-        "auto",
+        "name",
         description="How to interpret the identifier (`auto`, `name`, `cas`, `smiles`).",
     )
     context: Optional[str] = Field(
@@ -96,12 +97,24 @@ class WorkflowParams(BaseModel):
         None,
         description="Reserved for downstream LLM selection (not used server-side).",
     )
+    require_human_review: bool = Field(
+        default=False,
+        description="When True, high-risk checkpoints require explicit approval before artifacts are generated.",
+    )
+    workflow_id: Optional[str] = Field(
+        None,
+        description="Optional workflow ID for resuming a review-paused workflow.",
+    )
+    checkpoint_approvals: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Optional list of approved checkpoint decisions to resume a review-paused workflow.",
+    )
 
     @field_validator("search_type", mode="before")
     @classmethod
     def _normalise_search_type(cls, value: Any) -> str:
         if not value:
-            return "auto"
+            return "name"
         return str(value).strip().lower()
 
     @field_validator("qsar_mode", mode="before")
@@ -118,7 +131,7 @@ class GroupingJustificationParams(BaseModel):
         description="Target chemical identifier (common name, CAS number, or SMILES).",
     )
     search_type: str = Field(
-        "auto",
+        "name",
         description="How to interpret the target identifier (`auto`, `name`, `cas`, `smiles`).",
     )
     problem_formulation: str = Field(
@@ -146,7 +159,7 @@ class GroupingJustificationParams(BaseModel):
         description="Candidate source analogue or category member identifiers to resolve in the Toolbox.",
     )
     analogue_search_type: str = Field(
-        "auto",
+        "name",
         description="How to interpret the analogue identifiers (`auto`, `name`, `cas`, `smiles`).",
     )
     profiler_guids: List[str] = Field(
@@ -174,7 +187,7 @@ class GroupingJustificationParams(BaseModel):
     @classmethod
     def _normalise_search_modes(cls, value: Any) -> str:
         if not value:
-            return "auto"
+            return "name"
         return str(value).strip().lower()
 
     @field_validator("accepted_uncertainty_level", mode="before")
@@ -768,9 +781,11 @@ def _format_meta(
         "duration_ms": meta.get("duration_ms"),
         "timeout_profile": meta.get("timeout_profile"),
         "status_code": meta.get("status_code"),
+        "api_versions": meta.get("api_versions"),
+        "server_date": meta.get("server_date"),
     }
     entry.update({k: v for k, v in extra.items() if v is not None})
-    return entry
+    return {k: v for k, v in entry.items() if v is not None}
 
 
 def _aggregate_calls(calls: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1306,7 +1321,7 @@ def _build_workflow_portable_handoffs(
     identifier = str(
         inputs.get("identifier") or log_bundle.get("identifier") or ""
     ).strip()
-    search_type = str(inputs.get("search_type") or "auto")
+    search_type = str(inputs.get("search_type") or "name")
     selected_summary = None
     if isinstance(log_bundle.get("selected_chemical"), dict):
         selected_summary = _chemical_summary(
@@ -1662,7 +1677,7 @@ def _build_grouping_portable_handoffs(
         "oqtWorkflowRecord.v1": _build_portable_workflow_record(
             record_id=workflow_id,
             identifier=identifier,
-            search_type=str(inputs.get("search_type") or "auto"),
+            search_type=str(inputs.get("search_type") or "name"),
             context=inputs.get("context"),
             primary_entrypoint="build_grouping_justification",
             helper_tools=_unique(
@@ -1944,6 +1959,9 @@ async def run_oqt_multiagent_workflow(
     llm_provider: Optional[str],
     llm_model: Optional[str],
     llm_api_key: Optional[str],
+    require_human_review: bool = False,
+    workflow_id: Optional[str] = None,
+    checkpoint_approvals: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     profiler_guids = _unique(profiler_guids)
     simulator_guids = _unique(simulator_guids)
@@ -1983,6 +2001,21 @@ async def run_oqt_multiagent_workflow(
     status = "ok"
     identifier_display = identifier.strip()
     toolbox_calls: List[Dict[str, Any]] = []
+    workflow_id = workflow_id or str(uuid4())
+    checkpoint_approvals = checkpoint_approvals or []
+
+    # Apply any supplied checkpoint approvals before proceeding
+    for approval in checkpoint_approvals:
+        cid = approval.get("checkpoint_id")
+        decision_str = approval.get("decision", "approved")
+        if cid:
+            try:
+                decision = ReviewDecision(decision_str.lower())
+                review_orchestrator.submit_review(
+                    cid, "mcp_user", decision, comments=approval.get("comments")
+                )
+            except ValueError as exc:
+                log.warning("Invalid checkpoint approval %s: %s", cid, exc)
 
     if _looks_like_uuid(identifier_display):
         primary = {"ChemId": identifier_display, "Names": [identifier_display]}
@@ -2037,6 +2070,19 @@ async def run_oqt_multiagent_workflow(
         f"* Resolved `{identifier_display}` to **{preferred_name}** "
         f"(chemId `{chem_id}` · CAS {cas_display})."
     )
+
+    if require_human_review:
+        review_orchestrator.create_checkpoint_if_missing(
+            workflow_id=workflow_id,
+            step="chemical_identity",
+            data={
+                "input_identifier": identifier,
+                "resolved_name": preferred_name,
+                "chem_id": chem_id,
+                "cas": cas_display,
+                "search_type_used": search_type,
+            },
+        )
 
     profiler_provenance_cache: Dict[str, Dict[str, Any] | None] = {}
     simulator_provenance_cache: Dict[str, Dict[str, Any] | None] = {}
@@ -2135,11 +2181,36 @@ async def run_oqt_multiagent_workflow(
             model_provenance, model_info_entry = await _fetch_model_provenance(
                 qsar_guid, model_provenance_cache
             )
+            # Light-weight AD check (OQT-01)
+            domain_value = ""
+            if isinstance(domain, dict):
+                domain_value = domain.get("DomainResult") or domain.get("Domain") or ""
+            elif isinstance(domain, str):
+                domain_value = domain
+            domain_normalized = (
+                str(domain_value).strip().replace(" ", "").replace("-", "").lower()
+            )
+            ad_warning = domain_normalized in {"outofdomain", "out_of_domain"}
+
             qsar_result = {
                 "qsar_guid": qsar_guid,
                 "prediction": prediction,
                 "domain": domain,
+                "ad_status": "out_of_domain"
+                if ad_warning
+                else (
+                    "in_domain"
+                    if domain_normalized
+                    in {"indomain", "in_domain", "insideapplicabilitydomain"}
+                    else "unknown"
+                ),
+                "ad_warning": ad_warning,
             }
+            if ad_warning:
+                qsar_result["ad_recommendation"] = (
+                    "This prediction is outside the model's applicability domain. "
+                    "Treat with caution and consider experimental validation or read-across."
+                )
             if model_provenance:
                 qsar_result["model_provenance"] = model_provenance
             qsar_results.append(qsar_result)
@@ -2160,6 +2231,25 @@ async def run_oqt_multiagent_workflow(
         summary_lines.append(
             f"* Completed {len(qsar_results)} QSAR model run(s) for chemId `{chem_id}`."
         )
+        ad_warnings = [r for r in qsar_results if r.get("ad_warning")]
+        if ad_warnings:
+            summary_lines.append(
+                f"* ⚠️ {len(ad_warnings)} model run(s) reported OUT OF APPLICABILITY DOMAIN."
+            )
+            if require_human_review:
+                review_orchestrator.create_checkpoint_if_missing(
+                    workflow_id=workflow_id,
+                    step="ad_assessment",
+                    data={
+                        "chemical_name": preferred_name,
+                        "chem_id": chem_id,
+                        "ad_warning_count": len(ad_warnings),
+                        "ad_models": [
+                            {"guid": r["qsar_guid"], "ad_status": r.get("ad_status")}
+                            for r in ad_warnings
+                        ],
+                    },
+                )
 
     if context:
         summary_lines.append(f"* Context: {context}")
@@ -2175,6 +2265,38 @@ async def run_oqt_multiagent_workflow(
     toolbox_meta = _aggregate_calls(toolbox_calls)
     if toolbox_meta["calls"]:
         log_bundle["toolbox"] = toolbox_meta
+        # Capture upstream API version / timestamp from any call that has it (REG-05)
+        api_versions = None
+        server_date = None
+        for call in toolbox_meta["calls"]:
+            if isinstance(call, dict):
+                if not api_versions and call.get("api_versions"):
+                    api_versions = call["api_versions"]
+                if not server_date and call.get("server_date"):
+                    server_date = call["server_date"]
+        if api_versions or server_date:
+            log_bundle["toolbox_provenance"] = {
+                "api_versions": api_versions,
+                "server_date": server_date,
+            }
+
+    # Final review checkpoint before artifact generation (OQT-02)
+    pending = review_orchestrator.pending_checkpoints(workflow_id)
+    if require_human_review and pending:
+        review_orchestrator.create_checkpoint_if_missing(
+            workflow_id=workflow_id,
+            step="final_report",
+            data={
+                "preview_summary": "\n".join(summary_lines),
+                "predictions_count": len(qsar_results),
+                "warnings_count": len([r for r in qsar_results if r.get("ad_warning")]),
+            },
+        )
+        # Re-check pending after adding final checkpoint
+        pending = review_orchestrator.pending_checkpoints(workflow_id)
+        return _build_review_required_response(
+            workflow_id, summary_lines, log_bundle, toolbox_meta, pending
+        )
 
     if assistant_config:
         default_context = (
@@ -2264,6 +2386,38 @@ async def run_oqt_multiagent_workflow(
     return _build_workflow_response(status, summary_lines, log_bundle, toolbox_meta)
 
 
+def _build_review_required_response(
+    workflow_id: str,
+    summary_lines: List[str],
+    log_bundle: Dict[str, Any],
+    toolbox_meta: Dict[str, Any],
+    pending_checkpoints: List[Any],
+) -> Dict[str, Any]:
+    summary_markdown = "\n".join(
+        ["## QSAR Workflow Summary", ""] + summary_lines + ["", "*Workflow paused for human review.*"]
+    )
+    log_bundle["final_report"] = summary_markdown
+    response = {
+        "status": "review_required",
+        "identifier": log_bundle["inputs"]["identifier"],
+        "summary_markdown": summary_markdown,
+        "log_json": log_bundle,
+        "workflow_id": workflow_id,
+        "review_checkpoints": [cp.to_dict() for cp in pending_checkpoints],
+    }
+    if toolbox_meta.get("calls"):
+        response["toolbox"] = toolbox_meta
+    response["portable_handoffs"] = _build_workflow_portable_handoffs(
+        "review_required",
+        log_bundle,
+        toolbox_meta,
+        artifact_log=log_bundle,
+        summary_markdown=summary_markdown,
+        pdf_bytes=b"",
+    )
+    return response
+
+
 def _build_workflow_response(
     status: str,
     summary_lines: List[str],
@@ -2286,6 +2440,11 @@ def _build_workflow_response(
 
     pdf_report_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
+    qsar_results = log_bundle.get("qsar_results") or []
+    qsar_guids_executed = [
+        r["qsar_guid"] for r in qsar_results if isinstance(r, dict) and r.get("qsar_guid")
+    ]
+
     response = {
         "status": status,
         "identifier": log_bundle["inputs"]["identifier"],
@@ -2301,6 +2460,8 @@ def _build_workflow_response(
             pdf_bytes=pdf_bytes,
         ),
     }
+    if qsar_guids_executed:
+        response["qsar_models_executed"] = qsar_guids_executed
     if toolbox_meta.get("calls"):
         response["toolbox"] = toolbox_meta
     return response
@@ -3400,6 +3561,47 @@ async def build_grouping_justification(
     )
 
 
+class ApproveCheckpointParams(BaseModel):
+    checkpoint_id: str = Field(..., description="The checkpoint ID to approve or reject.")
+    decision: str = Field(
+        "approved",
+        description="Decision for this checkpoint: `approved` or `rejected`.",
+    )
+    comments: Optional[str] = Field(
+        None, description="Optional reviewer comments explaining the decision."
+    )
+
+
+async def approve_workflow_checkpoint(
+    checkpoint_id: str,
+    decision: str,
+    comments: Optional[str],
+) -> Dict[str, Any]:
+    checkpoint = review_orchestrator.get_checkpoint(checkpoint_id)
+    if not checkpoint:
+        return {
+            "status": "error",
+            "message": f"Checkpoint {checkpoint_id} not found.",
+        }
+    try:
+        review_decision = ReviewDecision(decision.lower())
+        review_orchestrator.submit_review(
+            checkpoint_id, "mcp_user", review_decision, comments=comments
+        )
+    except ValueError as exc:
+        return {
+            "status": "error",
+            "message": str(exc),
+        }
+    return {
+        "status": "ok",
+        "checkpoint_id": checkpoint_id,
+        "decision": review_decision.value,
+        "workflow_id": checkpoint.workflow_id,
+        "message": f"Checkpoint {checkpoint_id} marked as {review_decision.value}.",
+    }
+
+
 def register_workflow_tool() -> None:
     tool_registry.register(
         name="run_oqt_multiagent_workflow",
@@ -3418,6 +3620,12 @@ def register_workflow_tool() -> None:
         description="Builds an OECD-style grouping/read-across dossier by resolving a target and source analogues, collecting profiler/metabolism/QSAR evidence, and returning a structured justification with uncertainty reporting.",
         parameters_model=GroupingJustificationParams,
         implementation=build_grouping_justification,
+    )
+    tool_registry.register(
+        name="approve_workflow_checkpoint",
+        description="Approves or rejects a pending workflow review checkpoint. Used to resume workflows that paused for human review.",
+        parameters_model=ApproveCheckpointParams,
+        implementation=approve_workflow_checkpoint,
     )
 
 
