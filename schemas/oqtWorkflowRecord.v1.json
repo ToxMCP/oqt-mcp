@@ -18,7 +18,8 @@
     "artifacts",
     "attachments",
     "executionMetadata",
-    "provenance"
+    "provenance",
+    "reproducibility"
   ],
   "properties": {
     "schemaName": {
@@ -109,7 +110,7 @@
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["ok", "partial", "not_found", "error"]
+          "enum": ["ok", "partial", "not_found", "error", "review_required"]
         },
         "assistantEnabled": {
           "type": "boolean"
@@ -150,6 +151,9 @@
     },
     "provenance": {
       "$ref": "#/$defs/provenance"
+    },
+    "reproducibility": {
+      "$ref": "#/$defs/reproducibility"
     },
     "notes": {
       "type": "array",
@@ -299,6 +303,49 @@
         },
         "integrityNote": {
           "type": "string"
+        }
+      }
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputHash", "toolchainVersions", "upstreamVersions", "executionTimestamp"],
+      "properties": {
+        "inputHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "snapshotHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "toolchainVersions": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "app": {"type": "string"},
+            "python": {"type": "string"},
+            "fastapi": {"type": "string"},
+            "pydantic": {"type": "string"},
+            "httpx": {"type": "string"}
+          }
+        },
+        "upstreamVersions": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "apiVersions": {"type": "string"},
+            "serverDate": {"type": "string"},
+            "toolboxBuildVersion": {"type": "string"},
+            "databaseVersion": {"type": "string"}
+          }
+        },
+        "executionTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "randomSeed": {
+          "type": ["string", "null"]
         }
       }
     },

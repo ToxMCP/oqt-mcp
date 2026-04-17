@@ -4,8 +4,10 @@ import hashlib
 import inspect
 import json
 import logging
+import platform
 import re
 from datetime import datetime, timezone
+from importlib import metadata
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -15,6 +17,7 @@ from src.integrations import oqt_assistant
 from src.qsar import QsarClientError, qsar_client
 from src.tools.hazard_contracts import (
     build_decision_owner,
+    build_endpoint_summaries_from_payload,
     build_endpoint_summaries_from_qsar_results,
     build_hazard_applicability_domain,
     build_hazard_assessment_boundary,
@@ -31,10 +34,12 @@ from src.tools.hazard_contracts import (
     build_request_metadata,
     build_source_attribution,
 )
+from src.tools.implementations import uncertainty_thresholds as ut
 from src.tools.provenance import build_provenance
 from src.tools.registry import tool_registry
 from src.utils.pdf_generator import generate_pdf_report
 from src.utils.review import ReviewDecision, review_orchestrator
+from src.version import APP_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +49,20 @@ TOOLBOX_SOURCE_SYSTEM = "OECD QSAR Toolbox WebAPI"
 TOOLBOX_COMPATIBILITY_NOTE = (
     "Targets OECD QSAR Toolbox WebAPI /api/v6 compatibility routes."
 )
-GENERATED_BY_VERSION = "O-QT MCP Server v0.3.0"
+GENERATED_BY_VERSION = f"O-QT MCP Server v{APP_VERSION}"
+
+
+def _toolchain_versions() -> Dict[str, Any]:
+    return {
+        "app": APP_VERSION,
+        "python": platform.python_version(),
+        "fastapi": metadata.version("fastapi"),
+        "pydantic": metadata.version("pydantic"),
+        "httpx": metadata.version("httpx"),
+    }
+
+
+_TOOLCHAIN_VERSIONS = _toolchain_versions()
 
 
 def _looks_like_uuid(value: Any) -> bool:
@@ -109,6 +127,18 @@ class WorkflowParams(BaseModel):
         default_factory=list,
         description="Optional list of approved checkpoint decisions to resume a review-paused workflow.",
     )
+    package_mode: str = Field(
+        "working_bundle",
+        description="Package semantics mode: 'working_bundle' (live MCP) or 'packaged_dossier' (frozen export).",
+    )
+
+    @field_validator("package_mode", mode="before")
+    @classmethod
+    def _normalise_package_mode(cls, value: Any) -> str:
+        if not value:
+            return "working_bundle"
+        v = str(value).strip().lower()
+        return v if v in {"working_bundle", "packaged_dossier"} else "working_bundle"
 
     @field_validator("search_type", mode="before")
     @classmethod
@@ -182,6 +212,18 @@ class GroupingJustificationParams(BaseModel):
         None,
         description="Optional extra narrative instructions for the generated dossier.",
     )
+    package_mode: str = Field(
+        "working_bundle",
+        description="Package semantics mode: 'working_bundle' (live MCP) or 'packaged_dossier' (frozen export).",
+    )
+
+    @field_validator("package_mode", mode="before")
+    @classmethod
+    def _normalise_package_mode(cls, value: Any) -> str:
+        if not value:
+            return "working_bundle"
+        v = str(value).strip().lower()
+        return v if v in {"working_bundle", "packaged_dossier"} else "working_bundle"
 
     @field_validator("search_type", "analogue_search_type", mode="before")
     @classmethod
@@ -290,6 +332,52 @@ def _normalise_scalar(value: Any) -> Optional[str]:
     return text or None
 
 
+def _clamp_enum(value: Any, allowed: set[str], default: str) -> str:
+    v = _normalise_scalar(value)
+    return v if v in allowed else default
+
+
+def _merge_endpoint_summaries(
+    experimental: List[Dict[str, Any]],
+    qsar: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Merge experimental and QSAR endpoint summaries, preferring experimental data."""
+    by_endpoint: Dict[str, Dict[str, Any]] = {}
+    for summary in experimental:
+        if not isinstance(summary, dict):
+            continue
+        endpoint = summary.get("endpoint") or "Unspecified endpoint"
+        by_endpoint[endpoint] = dict(summary)
+
+    for summary in qsar:
+        if not isinstance(summary, dict):
+            continue
+        endpoint = summary.get("endpoint") or "Unspecified endpoint"
+        if endpoint in by_endpoint:
+            existing = by_endpoint[endpoint]
+            # Merge studyRecords if QSAR summaries have any (they usually don't)
+            existing["studyRecords"] = (
+                existing.get("studyRecords", []) + summary.get("studyRecords", [])
+            )
+            existing["recordCount"] = (
+                existing.get("recordCount", 0) + summary.get("recordCount", 0)
+            )
+            # Merge keyFindings
+            existing["keyFindings"] = _unique(
+                existing.get("keyFindings", []) + summary.get("keyFindings", [])
+            )
+            # Merge keyValues
+            if summary.get("keyValues"):
+                existing["keyValues"] = existing.get("keyValues", []) + summary["keyValues"]
+            # Upgrade evidence basis to mixed if they differ
+            if existing.get("evidenceBasis") != summary.get("evidenceBasis"):
+                existing["evidenceBasis"] = "mixed"
+        else:
+            by_endpoint[endpoint] = dict(summary)
+
+    return list(by_endpoint.values())
+
+
 def _summarise_payload(payload: Any) -> str:
     if payload is None:
         return "No payload returned."
@@ -384,6 +472,7 @@ def _build_artifact_entry(
 def _build_attachment_manifest(
     root_entity_type: str,
     artifacts: Dict[str, Dict[str, Any]],
+    package_mode: str = "working_bundle",
 ) -> List[Dict[str, Any]]:
     prefix = root_entity_type.replace("_", "-")
     manifest: List[Dict[str, Any]] = []
@@ -399,6 +488,38 @@ def _build_attachment_manifest(
                 "name": name,
                 "role": role,
                 **artifact,
+            }
+        )
+    if package_mode == "packaged_dossier":
+        manifest_payload = {
+            "version": "1.0",
+            "package_mode": package_mode,
+            "root_entity_type": root_entity_type,
+            "artifacts": {
+                key: {
+                    k: v
+                    for k, v in artifact.items()
+                    if k not in {"fieldName", "delivery", "mediaType", "description", "source"}
+                    or k in {"fieldName", "mediaType", "sizeBytes", "checksumSha256"}
+                }
+                for key, artifact in artifacts.items()
+            },
+            "attachments": [
+                {"name": item["name"], "role": item["role"], "mediaType": item["mediaType"]}
+                for item in manifest
+            ],
+        }
+        manifest_json = _canonical_json_bytes(manifest_payload)
+        manifest.append(
+            {
+                "name": f"{prefix}-manifest.json",
+                "role": "audit_report",
+                "fieldName": "manifest_json",
+                "delivery": "inline",
+                "mediaType": "application/json",
+                "description": "Manifest listing all packaged artifacts and attachments with integrity metadata.",
+                "sizeBytes": len(manifest_json),
+                "checksumSha256": hashlib.sha256(manifest_json).hexdigest(),
             }
         )
     return manifest
@@ -827,6 +948,39 @@ def _build_source_records(toolbox_meta: Dict[str, Any]) -> List[Dict[str, Any]]:
     return records
 
 
+def _build_reproducibility(
+    input_hash: str,
+    log_bundle: Dict[str, Any],
+    toolbox_meta: Dict[str, Any],
+    generated_at: str,
+) -> Dict[str, Any]:
+    """Build a reproducibility metadata block for the workflow record."""
+    toolbox_provenance = log_bundle.get("toolbox_provenance") or {}
+    if not toolbox_provenance:
+        for call in toolbox_meta.get("calls", []) or []:
+            if not isinstance(call, dict):
+                continue
+            if call.get("api_versions") or call.get("server_date"):
+                toolbox_provenance = {
+                    "api_versions": call.get("api_versions"),
+                    "server_date": call.get("server_date"),
+                }
+                break
+    upstream: Dict[str, Any] = {
+        "apiVersions": toolbox_provenance.get("api_versions") or "unknown",
+        "serverDate": toolbox_provenance.get("server_date") or "unknown",
+        "toolboxBuildVersion": "unknown",
+        "databaseVersion": "unknown",
+    }
+    return {
+        "inputHash": input_hash,
+        "toolchainVersions": _TOOLCHAIN_VERSIONS,
+        "upstreamVersions": upstream,
+        "executionTimestamp": generated_at,
+        "randomSeed": None,
+    }
+
+
 def _build_workflow_provenance(
     generated_at: str, toolbox_meta: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -1149,7 +1303,12 @@ def _build_qsar_findings(
             unit = None
             domain_status = None
             if isinstance(prediction, dict):
-                prediction_value = prediction.get("Value")
+                raw_value = prediction.get("Value")
+                prediction_value = (
+                    raw_value
+                    if isinstance(raw_value, (int, float, str)) and not isinstance(raw_value, bool)
+                    else None
+                )
                 endpoint = _normalise_scalar(prediction.get("Endpoint"))
                 unit = _normalise_scalar(prediction.get("Unit"))
                 domain_status = _normalise_scalar(
@@ -1163,28 +1322,25 @@ def _build_qsar_findings(
                     )
                 else:
                     domain_status = _normalise_scalar(domain)
-            findings.append(
-                {
-                    "qsarGuid": requested_id,
-                    "status": "ok",
-                    "predictionSummary": summary_prefix
-                    + _summarise_payload(matches[0].get("prediction")),
-                    "domainSummary": _summarise_payload(matches[0].get("domain")),
-                    **({"endpoint": endpoint} if endpoint else {}),
-                    **(
-                        {"predictedValue": prediction_value}
-                        if prediction_value is not None
-                        else {}
-                    ),
-                    **({"unit": unit} if unit else {}),
-                    **({"domainStatus": domain_status} if domain_status else {}),
-                    **(
-                        {"source": build_source_attribution(provenance)}
-                        if build_source_attribution(provenance)
-                        else {}
-                    ),
-                }
-            )
+            qsar_entry: Dict[str, Any] = {
+                "qsarGuid": requested_id,
+                "status": "ok",
+                "predictionSummary": summary_prefix
+                + _summarise_payload(matches[0].get("prediction")),
+                "domainSummary": _summarise_payload(matches[0].get("domain")),
+            }
+            if endpoint:
+                qsar_entry["endpoint"] = endpoint
+            if prediction_value is not None:
+                qsar_entry["predictedValue"] = prediction_value
+            if unit:
+                qsar_entry["unit"] = unit
+            if domain_status:
+                qsar_entry["domainStatus"] = domain_status
+            source_attribution = build_source_attribution(provenance)
+            if source_attribution:
+                qsar_entry["source"] = source_attribution
+            findings.append(qsar_entry)
             continue
 
         error_messages = _matching_errors(errors, requested_id)
@@ -1222,6 +1378,8 @@ def _build_portable_workflow_record(
     artifact_log: Optional[Dict[str, Any]] = None,
     summary_markdown: Optional[str] = None,
     pdf_bytes: Optional[bytes] = None,
+    package_mode: str = "working_bundle",
+    reproducibility: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     input_identifier = {"value": identifier}
     if isinstance(selected_summary, dict):
@@ -1281,10 +1439,14 @@ def _build_portable_workflow_record(
             "label": input_identifier.get("resolvedName") or identifier,
         },
         "packageSemantics": {
-            "mode": "working_bundle",
-            "isReadOnly": False,
+            "mode": package_mode,
+            "isReadOnly": package_mode == "packaged_dossier",
             "containsExternalReferences": True,
-            "purpose": "live_mcp_response",
+            "purpose": (
+                "packaged_dossier_export"
+                if package_mode == "packaged_dossier"
+                else "live_mcp_response"
+            ),
         },
         "toolchain": {
             "primaryEntrypoint": primary_entrypoint,
@@ -1292,7 +1454,7 @@ def _build_portable_workflow_record(
             "toolboxCompatibility": TOOLBOX_COMPATIBILITY_NOTE,
         },
         "artifacts": artifacts,
-        "attachments": _build_attachment_manifest(root_entity_type, artifacts),
+        "attachments": _build_attachment_manifest(root_entity_type, artifacts, package_mode),
         "executionMetadata": {
             "status": status,
             "assistantEnabled": assistant_enabled,
@@ -1304,6 +1466,7 @@ def _build_portable_workflow_record(
             "errors": [str(message) for message in log_bundle.get("errors", []) or []],
         },
         "provenance": _build_workflow_provenance(generated_at, toolbox_meta),
+        **({"reproducibility": reproducibility} if reproducibility else {}),
     }
 
 
@@ -1316,6 +1479,7 @@ def _build_workflow_portable_handoffs(
     artifact_log: Optional[Dict[str, Any]] = None,
     summary_markdown: Optional[str] = None,
     pdf_bytes: Optional[bytes] = None,
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     inputs = log_bundle.get("inputs", {})
     identifier = str(
@@ -1330,6 +1494,12 @@ def _build_workflow_portable_handoffs(
 
     generated_at = _iso_utc_now()
     workflow_id = _handoff_record_id("oqtwf")
+    input_hash = log_bundle.get("input_hash") or hashlib.sha256(
+        _canonical_json_bytes(inputs)
+    ).hexdigest()
+    reproducibility = _build_reproducibility(
+        input_hash, log_bundle, toolbox_meta, generated_at
+    )
     handoffs = {
         "oqtWorkflowRecord.v1": _build_portable_workflow_record(
             record_id=workflow_id,
@@ -1365,6 +1535,8 @@ def _build_workflow_portable_handoffs(
             artifact_log=artifact_log,
             summary_markdown=summary_markdown,
             pdf_bytes=pdf_bytes,
+            package_mode=package_mode,
+            reproducibility=reproducibility,
         )
     }
 
@@ -1388,8 +1560,19 @@ def _build_workflow_portable_handoffs(
         log_bundle.get("qsar_results", []) or [],
         errors,
     )
-    endpoint_summaries = build_endpoint_summaries_from_qsar_results(
+    experimental_summaries = build_endpoint_summaries_from_payload(
+        log_bundle.get("endpoint_data")
+    )
+    qsar_summaries = build_endpoint_summaries_from_qsar_results(
         log_bundle.get("qsar_results", []) or []
+    )
+    endpoint_summaries = _merge_endpoint_summaries(
+        experimental_summaries, qsar_summaries
+    )
+    experimental_endpoint_record_count = sum(
+        int(summary.get("recordCount") or 0)
+        for summary in experimental_summaries
+        if isinstance(summary, dict)
     )
 
     limitations: List[str] = []
@@ -1412,7 +1595,7 @@ def _build_workflow_portable_handoffs(
     limitations.extend(errors)
 
     uncertainty_assessment = build_hazard_uncertainty_assessment(
-        endpoint_record_count=0,
+        endpoint_record_count=experimental_endpoint_record_count,
         profiling_record_count=sum(
             1 for item in profiler_findings if item.get("status") == "ok"
         ),
@@ -1582,7 +1765,9 @@ def _classify_result_type(row: Dict[str, Any]) -> str:
 def _build_portable_data_matrix(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     portable_rows = []
     for row in rows or []:
-        status = _normalise_status(row.get("status")) or "not_run"
+        raw_status = _normalise_status(row.get("status")) or "not_run"
+        # dataMatrixRow.status enum does not include "not_found"
+        status = "error" if raw_status == "not_found" else raw_status
         subject_role = _normalise_scalar(row.get("subject_role")) or "unknown"
         if subject_role not in {
             "target",
@@ -1606,6 +1791,9 @@ def _build_portable_data_matrix(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         reference = _normalise_scalar(row.get("reference"))
         if reference:
             portable_row["reference"] = reference
+        metrics = row.get("metrics")
+        if metrics:
+            portable_row["quantitativeMetrics"] = metrics
         portable_rows.append(portable_row)
     return {
         "rowCount": len(portable_rows),
@@ -1623,15 +1811,23 @@ def _build_portable_uncertainty_table(
 ) -> Dict[str, Any]:
     rows = []
     for item in uncertainty_assessment.get("assessment_table", []) or []:
-        rows.append(
-            {
-                "aspect": str(item.get("aspect") or "unspecified"),
-                "dataQuality": str(item.get("data_quality") or "low"),
-                "strengthOfEvidence": str(item.get("strength_of_evidence") or "low"),
-                "uncertainty": str(item.get("uncertainty") or "high"),
-                "comments": str(item.get("comments") or ""),
-            }
-        )
+        row_payload: Dict[str, Any] = {
+            "aspect": str(item.get("aspect") or "unspecified"),
+            "dataQuality": _clamp_enum(
+                item.get("data_quality"), {"low", "medium", "high"}, "low"
+            ),
+            "strengthOfEvidence": _clamp_enum(
+                item.get("strength_of_evidence"), {"low", "medium", "high"}, "low"
+            ),
+            "uncertainty": _clamp_enum(
+                item.get("uncertainty"), {"low", "medium", "high"}, "high"
+            ),
+            "comments": str(item.get("comments") or ""),
+        }
+        metrics = item.get("metrics")
+        if metrics:
+            row_payload["quantitativeMetrics"] = metrics
+        rows.append(row_payload)
     acceptable = bool(uncertainty_assessment.get("acceptable_for_context", False))
     fit_message = (
         "Residual uncertainty is acceptable for the stated decision context."
@@ -1639,8 +1835,12 @@ def _build_portable_uncertainty_table(
         else f"Residual uncertainty remains above the accepted level for {decision_context or 'the stated decision context'}."
     )
     payload: Dict[str, Any] = {
-        "acceptedLevel": str(uncertainty_assessment.get("accepted_level") or "medium"),
-        "overallLevel": str(uncertainty_assessment.get("overall_level") or "high"),
+        "acceptedLevel": _clamp_enum(
+            uncertainty_assessment.get("accepted_level"), {"low", "medium", "high"}, "medium"
+        ),
+        "overallLevel": _clamp_enum(
+            uncertainty_assessment.get("overall_level"), {"low", "medium", "high"}, "high"
+        ),
         "acceptableForContext": acceptable,
         "decisionContextFit": fit_message,
         "whatIsNotAddressed": [
@@ -1649,6 +1849,9 @@ def _build_portable_uncertainty_table(
         ],
         "rows": rows,
     }
+    overall_metrics = uncertainty_assessment.get("metrics")
+    if overall_metrics:
+        payload["quantitativeMetrics"] = overall_metrics
     actions = _unique(recommended_follow_ups)
     if actions:
         payload["recommendedActions"] = actions
@@ -1665,6 +1868,7 @@ def _build_grouping_portable_handoffs(
     artifact_log: Optional[Dict[str, Any]] = None,
     summary_markdown: Optional[str] = None,
     pdf_bytes: Optional[bytes] = None,
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     inputs = log_bundle.get("inputs", {})
     report_context = grouping_justification.get("report_context", {}) or {}
@@ -1673,6 +1877,12 @@ def _build_grouping_portable_handoffs(
 
     generated_at = _iso_utc_now()
     workflow_id = _handoff_record_id("oqtgrp")
+    input_hash = log_bundle.get("input_hash") or hashlib.sha256(
+        _canonical_json_bytes(inputs)
+    ).hexdigest()
+    reproducibility = _build_reproducibility(
+        input_hash, log_bundle, toolbox_meta, generated_at
+    )
     handoffs = {
         "oqtWorkflowRecord.v1": _build_portable_workflow_record(
             record_id=workflow_id,
@@ -1708,6 +1918,8 @@ def _build_grouping_portable_handoffs(
             artifact_log=artifact_log,
             summary_markdown=summary_markdown,
             pdf_bytes=pdf_bytes,
+            package_mode=package_mode,
+            reproducibility=reproducibility,
         )
     }
 
@@ -1727,11 +1939,14 @@ def _build_grouping_portable_handoffs(
             {
                 "endpoint": str(item.get("endpoint") or "Unspecified endpoint"),
                 "conclusion": str(item.get("conclusion") or "No conclusion recorded."),
-                "confidence": str(item.get("confidence") or "low"),
-                "residualUncertainty": str(
+                "confidence": _clamp_enum(
+                    item.get("confidence"), {"low", "medium", "high"}, "low"
+                ),
+                "residualUncertainty": _clamp_enum(
                     item.get("residual_uncertainty")
-                    or uncertainty.get("overall_level")
-                    or "high"
+                    or uncertainty.get("overall_level"),
+                    {"low", "medium", "high"},
+                    "high",
                 ),
             }
         )
@@ -1786,8 +2001,10 @@ def _build_grouping_portable_handoffs(
             "decisionContext": str(
                 report_context.get("decision_context") or "Not specified."
             ),
-            "acceptedUncertaintyLevel": str(
-                report_context.get("accepted_uncertainty_level") or "medium"
+            "acceptedUncertaintyLevel": _clamp_enum(
+                report_context.get("accepted_uncertainty_level"),
+                {"low", "medium", "high"},
+                "medium",
             ),
             **(
                 {"routeOfExposure": str(report_context.get("route_of_exposure"))}
@@ -1814,7 +2031,9 @@ def _build_grouping_portable_handoffs(
                 f"overall residual uncertainty is {uncertainty.get('overall_level', 'high')}; "
                 "see uncertaintyTable for aspect-level scoring."
             ),
-            "residualUncertainty": str(uncertainty.get("overall_level") or "high"),
+            "residualUncertainty": _clamp_enum(
+                uncertainty.get("overall_level"), {"low", "medium", "high"}, "high"
+            ),
             "acceptableForContext": bool(
                 uncertainty.get("acceptable_for_context", False)
             ),
@@ -1863,6 +2082,7 @@ def build_portable_handoffs_from_log_bundle(
     log: Dict[str, Any],
     workflow_type: str = "auto",
     status: Optional[str] = None,
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     requested_type = _normalise_scalar(workflow_type) or "auto"
     if requested_type not in {"auto", "workflow", "grouping"}:
@@ -1919,6 +2139,7 @@ def build_portable_handoffs_from_log_bundle(
                     else None
                 )
                 or _normalise_scalar(log_bundle.get("final_report")),
+                package_mode=package_mode,
             ),
         }
 
@@ -1944,6 +2165,7 @@ def build_portable_handoffs_from_log_bundle(
                 else None
             )
             or _normalise_scalar(log_bundle.get("final_report")),
+            package_mode=package_mode,
         ),
     }
 
@@ -1962,6 +2184,7 @@ async def run_oqt_multiagent_workflow(
     require_human_review: bool = False,
     workflow_id: Optional[str] = None,
     checkpoint_approvals: Optional[List[Dict[str, Any]]] = None,
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     profiler_guids = _unique(profiler_guids)
     simulator_guids = _unique(simulator_guids)
@@ -1996,6 +2219,9 @@ async def run_oqt_multiagent_workflow(
         "qsar_results": [],
         "errors": [],
     }
+    log_bundle["input_hash"] = hashlib.sha256(
+        _canonical_json_bytes(log_bundle["inputs"])
+    ).hexdigest()
 
     summary_lines: List[str] = []
     status = "ok"
@@ -2036,7 +2262,7 @@ async def run_oqt_multiagent_workflow(
                 f"* Unable to resolve `{identifier_display}` in the Toolbox."
             )
             return _build_workflow_response(
-                status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls)
+                status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls), package_mode
             )
 
         hits = _coerce_hits(search_payload)
@@ -2054,7 +2280,7 @@ async def run_oqt_multiagent_workflow(
                 f"* No Toolbox records matched `{identifier_display}`."
             )
             return _build_workflow_response(
-                status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls)
+                status, summary_lines, log_bundle, _aggregate_calls(toolbox_calls), package_mode
             )
 
         primary = next((hit for hit in hits if hit.get("ChemId")), hits[0])
@@ -2087,6 +2313,19 @@ async def run_oqt_multiagent_workflow(
     profiler_provenance_cache: Dict[str, Dict[str, Any] | None] = {}
     simulator_provenance_cache: Dict[str, Dict[str, Any] | None] = {}
     model_provenance_cache: Dict[str, Dict[str, Any] | None] = {}
+
+    # Fetch endpoint study data for the resolved chemical (REG-04)
+    try:
+        endpoint_payload, endpoint_meta = await qsar_client.get_endpoint_data(
+            chem_id, include_metadata=True, with_meta=True
+        )
+        log_bundle["endpoint_data"] = endpoint_payload
+        toolbox_calls.append(
+            _format_meta("data/endpoint", endpoint_meta, chem_id=chem_id)
+        )
+    except QsarClientError as exc:
+        log.warning("Endpoint data retrieval failed: %s", exc)
+        log_bundle["endpoint_data"] = None
 
     profiler_results: List[Dict[str, Any]] = []
     for profiler_guid in profiler_guids:
@@ -2297,7 +2536,7 @@ async def run_oqt_multiagent_workflow(
         # Re-check pending after adding final checkpoint
         pending = review_orchestrator.pending_checkpoints(workflow_id)
         return _build_review_required_response(
-            workflow_id, summary_lines, log_bundle, toolbox_meta, pending
+            workflow_id, summary_lines, log_bundle, toolbox_meta, pending, package_mode
         )
 
     if assistant_config:
@@ -2385,7 +2624,7 @@ async def run_oqt_multiagent_workflow(
         summary_lines.append(f"* Assistant workflow unavailable: {assistant_error}.")
         log_bundle.setdefault("assistant", {})["error"] = assistant_error
 
-    return _build_workflow_response(status, summary_lines, log_bundle, toolbox_meta)
+    return _build_workflow_response(status, summary_lines, log_bundle, toolbox_meta, package_mode)
 
 
 def _build_review_required_response(
@@ -2394,6 +2633,7 @@ def _build_review_required_response(
     log_bundle: Dict[str, Any],
     toolbox_meta: Dict[str, Any],
     pending_checkpoints: List[Any],
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     summary_markdown = "\n".join(
         ["## QSAR Workflow Summary", ""]
@@ -2418,6 +2658,7 @@ def _build_review_required_response(
         artifact_log=log_bundle,
         summary_markdown=summary_markdown,
         pdf_bytes=b"",
+        package_mode=package_mode,
     )
     return response
 
@@ -2427,6 +2668,7 @@ def _build_workflow_response(
     summary_lines: List[str],
     log_bundle: Dict[str, Any],
     toolbox_meta: Dict[str, Any],
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     if not summary_lines:
         summary_lines = ["* No workflow actions were completed."]
@@ -2464,6 +2706,7 @@ def _build_workflow_response(
             artifact_log=log_bundle,
             summary_markdown=summary_markdown,
             pdf_bytes=pdf_bytes,
+            package_mode=package_mode,
         ),
     }
     if qsar_guids_executed:
@@ -2483,9 +2726,6 @@ def _build_similarity_assessment(
     qsar_results: List[Dict[str, Any]],
     grouping_hypothesis: str,
 ) -> Dict[str, Dict[str, Any]]:
-    analogue_count = len(source_analogues)
-    structure_summary = structure_comparison.get("summary", {})
-    physchem_summary = physicochemical_comparison.get("summary", {})
     target_profiles = sum(
         1 for item in profiler_results if item.get("subject_role") == "target"
     )
@@ -2500,144 +2740,28 @@ def _build_similarity_assessment(
     )
 
     return {
-        "structural_similarity": {
-            "status": (
-                "assessed"
-                if structure_summary.get("assessed_pairs")
-                else (
-                    "limited"
-                    if analogue_count
-                    and structure_comparison.get("target", {}).get("input_smiles")
-                    else "not_assessed"
-                )
-            ),
-            "data_quality": (
-                "medium" if structure_summary.get("assessed_pairs") else "low"
-            ),
-            "strength_of_evidence": (
-                "medium" if structure_summary.get("assessed_pairs") else "low"
-            ),
-            "comments": (
-                f"Assessed {structure_summary.get('assessed_pairs', 0)} target/source pair(s); "
-                f"{structure_summary.get('canonical_exact_matches', 0)} canonical SMILES exact match(es) and "
-                f"{structure_summary.get('connectivity_exact_matches', 0)} connectivity exact match(es)."
-                if structure_summary.get("assessed_pairs")
-                else (
-                    "Source analogues were resolved, but comparable structure signatures were not available for the assessed pairs."
-                    if analogue_count
-                    else "No source analogues were provided, so structural similarity could not be documented."
-                )
-            ),
-        },
-        "physicochemical_similarity": {
-            "status": (
-                "assessed"
-                if physchem_summary.get("assessed_pairs")
-                else (
-                    "limited"
-                    if analogue_count
-                    and physicochemical_comparison.get("target_descriptors")
-                    else "not_assessed"
-                )
-            ),
-            "data_quality": (
-                "medium" if physchem_summary.get("shared_descriptor_count") else "low"
-            ),
-            "strength_of_evidence": (
-                "medium" if physchem_summary.get("shared_descriptor_count") else "low"
-            ),
-            "comments": (
-                f"Compared {physchem_summary.get('shared_descriptor_count', 0)} shared physicochemical descriptor(s) across "
-                f"{physchem_summary.get('assessed_pairs', 0)} target/source pair(s)."
-                if physchem_summary.get("shared_descriptor_count")
-                else (
-                    "Target and source substances were resolved, but no overlapping physicochemical descriptors were exposed in the available records."
-                    if analogue_count
-                    else "No source analogues were provided, so physicochemical similarity could not be documented."
-                )
-            ),
-        },
-        "reactivity_profile_similarity": {
-            "status": (
-                "assessed"
-                if target_profiles and source_profiles
-                else "limited" if target_profiles else "not_assessed"
-            ),
-            "data_quality": "medium" if target_profiles else "low",
-            "strength_of_evidence": (
-                "medium" if target_profiles and source_profiles else "low"
-            ),
-            "comments": (
-                f"Profiler evidence was gathered under the hypothesis: {grouping_hypothesis}"
-                if target_profiles
-                else "No profiler evidence was collected for the selected substances."
-            ),
-        },
-        "adme_tk_similarity": {
-            "status": (
-                "assessed"
-                if target_simulators and source_simulators
-                else "limited" if target_simulators else "not_assessed"
-            ),
-            "data_quality": "medium" if target_simulators else "low",
-            "strength_of_evidence": (
-                "medium" if target_simulators and source_simulators else "low"
-            ),
-            "comments": (
-                "Metabolism simulator output is available for the target and at least one source analogue."
-                if target_simulators and source_simulators
-                else (
-                    "Metabolism simulation is only available for the target substance."
-                    if target_simulators
-                    else "No metabolism simulator evidence was collected."
-                )
-            ),
-        },
-        "bioactivity_similarity": {
-            "status": "limited" if profiler_results or qsar_results else "not_assessed",
-            "data_quality": "medium" if profiler_results or qsar_results else "low",
-            "strength_of_evidence": "low",
-            "comments": (
-                "Bioactivity support is limited to profiler and QSAR outputs collected in this dossier."
-                if profiler_results or qsar_results
-                else "No bioactivity-oriented evidence was collected."
-            ),
-        },
-        "mechanistic_similarity": {
-            "status": (
-                "limited" if profiler_groupings or simulator_results else "not_assessed"
-            ),
-            "data_quality": (
-                "medium" if profiler_groupings or simulator_results else "low"
-            ),
-            "strength_of_evidence": "medium" if profiler_groupings else "low",
-            "comments": (
-                "Mechanistic support is based on profiler grouping and/or metabolism evidence."
-                if profiler_groupings or simulator_results
-                else "No mechanistic support was collected."
-            ),
-        },
-        "toxicological_profile_similarity": {
-            "status": "limited" if qsar_results else "not_assessed",
-            "data_quality": "medium" if qsar_results else "low",
-            "strength_of_evidence": "low",
-            "comments": (
-                "Target-side QSAR predictions were included as supporting evidence."
-                if qsar_results
-                else "No QSAR model support was included in this dossier."
-            ),
-        },
+        "structural_similarity": ut.assess_structural_similarity(
+            structure_comparison.get("summary", {})
+        ),
+        "physicochemical_similarity": ut.assess_physicochemical_similarity(
+            physicochemical_comparison
+        ),
+        "reactivity_profile_similarity": ut.assess_reactivity_profile_similarity(
+            target_profiles, source_profiles, grouping_hypothesis
+        ),
+        "adme_tk_similarity": ut.assess_adme_tk_similarity(
+            target_simulators, source_simulators
+        ),
+        "bioactivity_similarity": ut.assess_bioactivity_similarity(
+            profiler_results, qsar_results
+        ),
+        "mechanistic_similarity": ut.assess_mechanistic_similarity(
+            profiler_groupings, simulator_results
+        ),
+        "toxicological_profile_similarity": ut.assess_toxicological_profile_similarity(
+            qsar_results
+        ),
     }
-
-
-def _uncertainty_from_context(context: Dict[str, Any]) -> str:
-    if context.get("status") == "not_assessed":
-        return "high"
-    if context.get("strength_of_evidence") == "high":
-        return "low"
-    if context.get("strength_of_evidence") == "medium":
-        return "medium"
-    return "high"
 
 
 def _build_uncertainty_assessment(
@@ -2648,42 +2772,32 @@ def _build_uncertainty_assessment(
     ranks = {"low": 1, "medium": 2, "high": 3}
     rows: List[Dict[str, Any]] = []
     missing_aspects: List[str] = []
-    scores: List[int] = []
 
     for aspect, context in similarity_assessment.items():
-        uncertainty = _uncertainty_from_context(context)
         rows.append(
             {
                 "aspect": aspect,
                 "data_quality": context.get("data_quality", "low"),
                 "strength_of_evidence": context.get("strength_of_evidence", "low"),
-                "uncertainty": uncertainty,
+                "uncertainty": context.get("uncertainty", "high"),
                 "comments": context.get("comments", ""),
+                "metrics": context.get("metrics", []),
             }
         )
         if context.get("status") == "not_assessed":
             missing_aspects.append(aspect)
-        scores.append(ranks[uncertainty])
 
-    overall_level = "high"
-    if scores:
-        average = sum(scores) / len(scores)
-        if average <= 1.4:
-            overall_level = "low"
-        elif average <= 2.2:
-            overall_level = "medium"
-    if not source_analogues:
-        overall_level = "high"
-
+    overall = ut.compute_overall_uncertainty(similarity_assessment, len(source_analogues))
     accepted_level = (
         accepted_uncertainty_level if accepted_uncertainty_level in ranks else "medium"
     )
     return {
         "accepted_level": accepted_level,
-        "overall_level": overall_level,
-        "acceptable_for_context": ranks[overall_level] <= ranks[accepted_level],
+        "overall_level": overall["overall_level"],
+        "acceptable_for_context": ranks[overall["overall_level"]] <= ranks[accepted_level],
         "what_is_not_addressed": missing_aspects,
         "assessment_table": rows,
+        "metrics": overall["metrics"],
     }
 
 
@@ -2881,6 +2995,7 @@ def _build_grouping_response(
     log_bundle: Dict[str, Any],
     grouping_justification: Dict[str, Any],
     toolbox_meta: Dict[str, Any],
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     log_bundle["final_report"] = summary_markdown
     log_bundle["grouping_justification"] = grouping_justification
@@ -2909,6 +3024,7 @@ def _build_grouping_response(
             artifact_log=log_bundle,
             summary_markdown=summary_markdown,
             pdf_bytes=pdf_bytes,
+            package_mode=package_mode,
         ),
     }
     if toolbox_meta.get("calls"):
@@ -2931,6 +3047,7 @@ async def build_grouping_justification(
     qsar_guids: List[str],
     accepted_uncertainty_level: str,
     context: Optional[str],
+    package_mode: str = "working_bundle",
 ) -> Dict[str, Any]:
     endpoints = _unique(endpoints)
     analogue_identifiers = _unique(analogue_identifiers)
@@ -2970,6 +3087,9 @@ async def build_grouping_justification(
         "data_matrix": [],
         "errors": [],
     }
+    log_bundle["input_hash"] = hashlib.sha256(
+        _canonical_json_bytes(log_bundle["inputs"])
+    ).hexdigest()
 
     target_resolution = await _resolve_chemical(
         identifier, search_type, "grouping/target", toolbox_calls
@@ -3015,6 +3135,7 @@ async def build_grouping_justification(
                 ],
             },
             _aggregate_calls(toolbox_calls),
+            package_mode,
         )
 
     target_substance = target_resolution["summary"]
@@ -3556,6 +3677,20 @@ async def build_grouping_justification(
     toolbox_meta = _aggregate_calls(toolbox_calls)
     if toolbox_meta.get("calls"):
         log_bundle["toolbox"] = toolbox_meta
+        # Capture upstream API version / timestamp from any call that has it
+        api_versions = None
+        server_date = None
+        for call in toolbox_meta["calls"]:
+            if isinstance(call, dict):
+                if not api_versions and call.get("api_versions"):
+                    api_versions = call["api_versions"]
+                if not server_date and call.get("server_date"):
+                    server_date = call["server_date"]
+        if api_versions or server_date:
+            log_bundle["toolbox_provenance"] = {
+                "api_versions": api_versions,
+                "server_date": server_date,
+            }
 
     return _build_grouping_response(
         status,
@@ -3564,6 +3699,7 @@ async def build_grouping_justification(
         log_bundle,
         grouping_justification,
         toolbox_meta,
+        package_mode,
     )
 
 

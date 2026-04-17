@@ -20,7 +20,9 @@
     "structure_connectivity",
     "list_search_databases",
     "render_pdf_from_log",
-    "build_portable_handoffs_from_log"
+    "build_portable_handoffs_from_log",
+    "export_grouping_bundle",
+    "export_hazard_summary"
   ],
   "RESEARCHER": [
     "get_public_qsar_model_info",
@@ -54,7 +56,9 @@
     "structure_connectivity",
     "list_search_databases",
     "render_pdf_from_log",
-    "build_portable_handoffs_from_log"
+    "build_portable_handoffs_from_log",
+    "export_grouping_bundle",
+    "export_hazard_summary"
   ],
   "LAB_ADMIN": [
     "get_public_qsar_model_info",
@@ -89,7 +93,9 @@
     "structure_connectivity",
     "list_search_databases",
     "render_pdf_from_log",
-    "build_portable_handoffs_from_log"
+    "build_portable_handoffs_from_log",
+    "export_grouping_bundle",
+    "export_hazard_summary"
   ],
   "SYSTEM_BYPASS": [
     "get_public_qsar_model_info",
@@ -124,6 +130,8 @@
     "structure_connectivity",
     "list_search_databases",
     "render_pdf_from_log",
-    "build_portable_handoffs_from_log"
+    "build_portable_handoffs_from_log",
+    "export_grouping_bundle",
+    "export_hazard_summary"
   ]
 }

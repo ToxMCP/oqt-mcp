@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "fileName": "hazardEvidenceSummary.json",
+      "mediaType": "application/json",
+      "sizeBytes": 2,
+      "checksumSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "fileName": "log.json",
+      "mediaType": "application/json",
+      "sizeBytes": 706,
+      "checksumSha256": "b06757c8067af629c72989a389fb050cedd932360598a2f39a1e413b9ee1ef93"
+    },
+    {
+      "fileName": "summary.md",
+      "mediaType": "text/markdown",
+      "sizeBytes": 71,
+      "checksumSha256": "bfe9e177b5e8d69ee694a0a807b59b88ab47126a97cbe4f67fad86b23eb49977"
+    },
+    {
+      "fileName": "report.pdf",
+      "mediaType": "application/pdf",
+      "sizeBytes": 3277,
+      "checksumSha256": "a65000e0f2aff2b75534a2b5734b08d66b5d4e9ceeddfb39b9c150f454fa7a3c"
+    }
+  ]
+}

@@ -882,6 +882,7 @@ def build_endpoint_summaries_from_payload(
                 "evidenceBasis": "experimental_data",
                 "keyFindings": [],
                 "studyRecords": [],
+                "keyValues": [],
             },
         )
         bucket["recordCount"] += 1
@@ -893,6 +894,8 @@ def build_endpoint_summaries_from_payload(
         overall_result = _normalise_scalar(record.get("overallResult"))
         value = _normalise_scalar(record.get("value"))
         unit = _normalise_scalar(record.get("unit"))
+        qualifier = _normalise_scalar(record.get("qualifier"))
+        data_type = _normalise_scalar(record.get("dataType"))
         if overall_result:
             bucket["keyFindings"].append(f"Overall result: {overall_result}")
         elif value:
@@ -901,8 +904,32 @@ def build_endpoint_summaries_from_payload(
                 finding = f"{finding} {unit}"
             bucket["keyFindings"].append(finding)
 
+        if value is not None or unit or qualifier or data_type:
+            key_value: Dict[str, Any] = {}
+            if value is not None:
+                key_value["value"] = value
+            if unit:
+                key_value["unit"] = unit
+            if qualifier:
+                key_value["qualifier"] = qualifier
+            if data_type:
+                key_value["dataType"] = data_type
+            if key_value:
+                bucket["keyValues"].append(key_value)
+
+        if overall_result:
+            bucket["classificationRationale"] = (
+                f"Overall result from Toolbox endpoint study record: {overall_result}."
+            )
+
     for bucket in grouped.values():
         bucket["keyFindings"] = _unique(bucket["keyFindings"])
+        if not bucket.get("keyValues"):
+            bucket.pop("keyValues", None)
+        bucket["provenance"] = {
+            "sourceSystem": "OECD QSAR Toolbox WebAPI",
+            "generatedBy": "o-qt-mcp-server",
+        }
 
     return list(grouped.values())
 

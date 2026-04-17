@@ -1,0 +1,179 @@
+{
+  "artifacts": {
+    "json": {
+      "delivery": "inline",
+      "description": "Comprehensive workflow log bundle.",
+      "fieldName": "log_json",
+      "integrityNote": "SHA-256 computed over canonical JSON serialization.",
+      "mediaType": "application/json",
+      "source": "mcp-inline-field"
+    },
+    "markdown": {
+      "delivery": "inline",
+      "description": "Human-readable workflow narrative.",
+      "fieldName": "summary_markdown",
+      "mediaType": "text/markdown",
+      "source": "mcp-inline-field"
+    },
+    "pdf": {
+      "delivery": "inline",
+      "description": "Base64-encoded PDF report.",
+      "encoding": "base64",
+      "fieldName": "pdf_report_base64",
+      "mediaType": "application/pdf",
+      "source": "mcp-inline-field"
+    }
+  },
+  "attachments": [
+    {
+      "delivery": "inline",
+      "description": "Comprehensive workflow log bundle.",
+      "fieldName": "log_json",
+      "integrityNote": "SHA-256 computed over canonical JSON serialization.",
+      "mediaType": "application/json",
+      "name": "workflow-execution-log.json",
+      "role": "structured_log",
+      "source": "mcp-inline-field"
+    },
+    {
+      "delivery": "inline",
+      "description": "Human-readable workflow narrative.",
+      "fieldName": "summary_markdown",
+      "mediaType": "text/markdown",
+      "name": "workflow-execution-summary.md",
+      "role": "narrative_summary",
+      "source": "mcp-inline-field"
+    },
+    {
+      "delivery": "inline",
+      "description": "Base64-encoded PDF report.",
+      "encoding": "base64",
+      "fieldName": "pdf_report_base64",
+      "mediaType": "application/pdf",
+      "name": "workflow-execution-report.pdf",
+      "role": "audit_report",
+      "source": "mcp-inline-field"
+    }
+  ],
+  "context": null,
+  "executionMetadata": {
+    "assistantEnabled": false,
+    "errors": [],
+    "requestedProfilers": [
+      "prof-1"
+    ],
+    "requestedQsarModels": [
+      "qsar-1"
+    ],
+    "requestedSimulators": [
+      "sim-1"
+    ],
+    "status": "ok",
+    "toolboxCallCount": 8,
+    "toolboxTotalDurationMs": 62.0
+  },
+  "inputIdentifier": {
+    "chemId": "chem-benzene",
+    "resolvedName": "Benzene",
+    "value": "benzene"
+  },
+  "module": "oqt-mcp",
+  "packageSemantics": {
+    "containsExternalReferences": true,
+    "isReadOnly": false,
+    "mode": "working_bundle",
+    "purpose": "live_mcp_response"
+  },
+  "provenance": {
+    "references": [
+      "https://github.com/ToxMCP/toxmcp"
+    ],
+    "repository": "https://github.com/ToxMCP/oqt-mcp",
+    "sourceSystem": "OECD QSAR Toolbox WebAPI",
+    "sourceTools": [
+      "workflow/search",
+      "profiling/execute",
+      "profiling/info",
+      "metabolism/simulate",
+      "metabolism/info",
+      "qsar/apply",
+      "qsar/domain",
+      "about/object"
+    ],
+    "sources": [
+      {
+        "endpoint": "workflow/search",
+        "name": "workflow/search"
+      },
+      {
+        "endpoint": "profiling/execute",
+        "name": "profiling/execute",
+        "reference": "prof-1"
+      },
+      {
+        "endpoint": "profiling/info",
+        "name": "profiling/info",
+        "reference": "prof-1"
+      },
+      {
+        "endpoint": "metabolism/simulate",
+        "name": "metabolism/simulate",
+        "reference": "sim-1"
+      },
+      {
+        "endpoint": "metabolism/info",
+        "name": "metabolism/info",
+        "reference": "sim-1"
+      },
+      {
+        "endpoint": "qsar/apply",
+        "name": "qsar/apply",
+        "reference": "qsar-1"
+      },
+      {
+        "endpoint": "qsar/domain",
+        "name": "qsar/domain",
+        "reference": "qsar-1"
+      },
+      {
+        "endpoint": "about/object",
+        "name": "about/object",
+        "reference": "qsar-1"
+      }
+    ],
+    "toolboxCompatibility": "Targets OECD QSAR Toolbox WebAPI /api/v6 compatibility routes."
+  },
+  "reproducibility": {
+    "randomSeed": null,
+    "toolchainVersions": {
+      "app": "0.3.1",
+      "fastapi": "0.135.3",
+      "httpx": "0.28.1",
+      "pydantic": "2.13.1",
+      "python": "3.14.3"
+    },
+    "upstreamVersions": {
+      "apiVersions": "6.0",
+      "databaseVersion": "unknown",
+      "serverDate": "Mon, 16 Apr 2026 10:00:00 GMT",
+      "toolboxBuildVersion": "unknown"
+    }
+  },
+  "rootEntity": {
+    "entityType": "workflow_execution",
+    "label": "Benzene"
+  },
+  "schemaName": "oqtWorkflowRecord",
+  "schemaVersion": "v1",
+  "searchType": "name",
+  "toolchain": {
+    "helperTools": [
+      "search_chemicals",
+      "run_profiler",
+      "run_metabolism_simulator",
+      "run_qsar_model"
+    ],
+    "primaryEntrypoint": "run_oqt_multiagent_workflow",
+    "toolboxCompatibility": "Targets OECD QSAR Toolbox WebAPI /api/v6 compatibility routes."
+  }
+}

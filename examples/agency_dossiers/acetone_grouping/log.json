@@ -1,0 +1,70 @@
+{
+  "identifier": "67-64-1",
+  "inputs": {
+    "identifier": "67-64-1",
+    "search_type": "cas",
+    "problem_formulation": "Assess structural grouping for ketone read-across.",
+    "decision_context": "hazard_identification",
+    "endpoints": [
+      "Acute toxicity"
+    ],
+    "route_of_exposure": null,
+    "grouping_hypothesis": "Ketones share metabolic pathways and similar toxicological profiles.",
+    "analogue_identifiers": [
+      "78-93-3"
+    ],
+    "analogue_search_type": "cas",
+    "profiler_guids": [],
+    "simulator_guids": [],
+    "qsar_guids": [],
+    "accepted_uncertainty_level": "medium",
+    "context": null
+  },
+  "generated_by": "O-QT MCP Server",
+  "target_resolution": {
+    "identifier": "67-64-1",
+    "search_type": "cas",
+    "status": "error",
+    "hits": [],
+    "selected": null,
+    "summary": null,
+    "error": "Failed to reach QSAR Toolbox API after 2 attempts"
+  },
+  "analogue_resolutions": [],
+  "excluded_analogues": [],
+  "structure_comparison": {},
+  "physicochemical_comparison": {},
+  "profiler_results": [],
+  "profiler_groupings": [],
+  "simulator_results": [],
+  "qsar_results": [],
+  "data_matrix": [],
+  "errors": [
+    "Failed to reach QSAR Toolbox API after 2 attempts"
+  ],
+  "input_hash": "bb2ec4c96957ae33283b17a26d64ceb71d3aeab118ba76c86f4259e4731ca785",
+  "final_report": "## OECD Grouping Justification\n\n* Target resolution failed for `67-64-1`.\n* Reason: Failed to reach QSAR Toolbox API after 2 attempts",
+  "grouping_justification": {
+    "report_context": {
+      "identifier": "67-64-1",
+      "decision_context": "hazard_identification",
+      "problem_formulation": "Assess structural grouping for ketone read-across.",
+      "grouping_hypothesis": "Ketones share metabolic pathways and similar toxicological profiles.",
+      "endpoints": [
+        "Acute toxicity"
+      ]
+    },
+    "target_substance": null,
+    "source_analogues": [],
+    "excluded_analogues": [],
+    "structure_comparison": {},
+    "physicochemical_comparison": {},
+    "data_matrix": [],
+    "similarity_assessment": {},
+    "uncertainty_assessment": {},
+    "endpoint_justifications": [],
+    "recommended_follow_ups": [
+      "Resolve the target substance in the Toolbox before attempting a grouping dossier."
+    ]
+  }
+}
