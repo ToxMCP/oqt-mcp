@@ -1,0 +1,25 @@
+{
+  "identifier": "71-43-2",
+  "inputs": {
+    "identifier": "71-43-2",
+    "search_type": "cas",
+    "context": null,
+    "profiler_guids": [],
+    "qsar_mode": "recommended",
+    "qsar_guids": [],
+    "simulator_guids": [],
+    "llm_provider": null,
+    "llm_model": null
+  },
+  "generated_by": "O-QT MCP Server",
+  "search_results": [],
+  "selected_chemical": null,
+  "profiler_results": [],
+  "simulator_results": [],
+  "qsar_results": [],
+  "errors": [
+    "Search failed: Failed to reach QSAR Toolbox API after 2 attempts"
+  ],
+  "input_hash": "4379bdaaafd0daacc841e21fd40f401a44478f564ea5c2af155d79fa1fabd39b",
+  "final_report": "## QSAR Workflow Summary\n\n* Unable to resolve `71-43-2` in the Toolbox."
+}
