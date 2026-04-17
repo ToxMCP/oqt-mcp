@@ -18,6 +18,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-04-17
+
+### Added
+- **Human review checkpoints** (`OQT-02`). When `require_human_review=true` is passed to `run_oqt_multiagent_workflow`, the workflow now pauses at up to three checkpoints (`chemical_identity`, `ad_assessment`, `final_report`) and returns `status: "review_required"` instead of auto-generating artifacts.
+- `approve_workflow_checkpoint` tool to explicitly approve or reject pending workflow checkpoints.
+- **Applicability-domain hard gating** (`OQT-01`). Out-of-domain predictions block PDF generation when `require_human_review=true`.
+- `PrivacyLogFilter` (`OQT-05`) to scrub SMILES, CAS numbers, and chemical names from free-text log messages and URL query parameters before emission.
+- `sanitize_for_llm()` utility (`OQT-04`) to strip control characters, backticks, and dollar signs from untrusted identifiers before they enter LLM-facing contexts.
+- Fallback PDF provenance enhancements (`OQT-03`): disclaimer header, applicability-domain warnings section, and provenance summary showing models run and AD warning count.
+- `qsar_models_executed` field in the workflow response for full QSAR transparency (`MD-004`).
+- Safer search defaults (`HG-001`): `search_type` now defaults to `"name"` instead of `"auto"`.
+- Unit tests for sanitization, privacy scrubbing, and review checkpoint orchestration.
+
+### Changed
+- HTTP audit middleware now parses query strings into dictionaries so parameter keys remain readable while values are hashed.
+- Updated `AGENTS.md` with critical-control policies to prevent future regressions of AD gating, sanitization, privacy, and review defaults.
+
+### Fixed
+- Removed raw chemical identifiers from audit logs; all SMILES, CAS, and chemical-name values are now hashed before emission.
+
+---
+
 ## [0.3.0] - 2026-04-08
 
 ### Added
@@ -60,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile and docker-compose stack for local development with Toolbox API stub.
 - Taskmaster backlog, documentation set (`docs/auth_testing.md`, `docs/observability.md`, `docs/testing.md`), and CI workflow skeleton.
 
-[Unreleased]: https://github.com/ToxMCP/oqt-mcp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ToxMCP/oqt-mcp/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.1.0

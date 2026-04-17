@@ -23,6 +23,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.utils.sanitization import sanitize_for_llm
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -313,21 +315,26 @@ async def _run_agents(
     """
     Execute the oqt_assistant specialist agents and synthesiser.
     """
+    # Harden LLM-facing inputs against prompt-boundary confusion (OQT-04 / SEC-02)
+    safe_identifier = sanitize_for_llm(identifier)
+    safe_context = sanitize_for_llm(context)
+
     specialist_outputs: Dict[str, str] = {}
     logger.info("  [Analysis] Starting assistant agents.")
 
     try:
         identity_txt = await analyze_chemical_context(
             {"basic_info": bundle.get("chemical_data", {}).get("basic_info", {})},
-            context,
+            safe_context,
             llm_config,
         )
     except Exception as exc:  # pragma: no cover - defensive branch
         logger.error("Chemical context agent failed: %s", exc)
         identity_txt = f"[Chemical Context agent failed: {exc}]"
 
-    specialist_outputs["Chemical_Context"] = identity_txt
-    analysis_context = f"{identity_txt}\n\nUser Goal: {context}"
+    safe_identity_txt = sanitize_for_llm(identity_txt)
+    specialist_outputs["Chemical_Context"] = safe_identity_txt
+    analysis_context = f"{safe_identity_txt}\n\nUser Goal: {safe_context}"
 
     props = bundle.get("chemical_data", {}).get("properties", {})
     profiling = bundle.get("profiling", {})
@@ -389,11 +396,12 @@ async def _run_agents(
         logger.error("Read-Across agent failed: %s", exc)
         read_across = f"[Read Across agent failed: {exc}]"
 
-    specialist_outputs["Read_Across"] = read_across
+    safe_read_across = sanitize_for_llm(read_across)
+    specialist_outputs["Read_Across"] = safe_read_across
 
     try:
         final_report = await synthesize_report(
-            identifier, core_outputs, read_across, context, llm_config
+            safe_identifier, core_outputs, safe_read_across, safe_context, llm_config
         )
     except Exception as exc:  # pragma: no cover - defensive branch
         logger.error("Report synthesis failed: %s", exc)

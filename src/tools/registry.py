@@ -9,6 +9,7 @@ from src.auth.rbac import check_permission
 from src.auth.service import User
 from src.mcp.protocol import ToolDefinition
 from src.utils import audit
+from src.utils.privacy import scrub_dict
 
 log = logging.getLogger(__name__)
 
@@ -136,8 +137,9 @@ class ToolRegistry:
         # CRITICAL: This should be handled by a dedicated, immutable audit service in production
         # Ensure PII/Sensitive data in params is sanitized before logging if necessary.
         try:
-            # Attempt a safe serialization for logging
-            logged_params = json.dumps(params, default=str, indent=2)[:500]
+            # Scrub sensitive identifiers before logging (OQT-05)
+            scrubbed_params = scrub_dict(params)
+            logged_params = json.dumps(scrubbed_params, default=str, indent=2)[:500]
         except Exception:
             logged_params = "Params serialization failed"
 
