@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - _TBD_
 
+### Security
+- **Dependency vulnerability remediation.** Bumped dependencies to clear all 37 known
+  vulnerabilities (11 packages) reported by `pip-audit`; a fresh audit now reports
+  zero. Direct deps raised: `authlib` 1.6.5->1.7.2, `fastapi` 0.111.1->0.137.2
+  (pulls `starlette` 0.37.2->1.3.1, the fix for CVE-2026-54283/54282/48818/48817 and
+  others), `uvicorn` 0.29.0->0.49.0, `pydantic` 2.7.4->2.13.4,
+  `pydantic-settings` 2.3.4->2.14.1, `httpx` 0.27.2->0.28.1, `requests` 2.32.5->2.34.2,
+  `black` 24.10.0->26.5.1, `pytest` 8.4.2->9.1.0, `pytest-asyncio` 0.23.x->1.4.0.
+  Transitive floors pinned to clear remaining CVEs: `cryptography` 46.0.3->48.0.1,
+  `idna` 3.11->3.18, `urllib3` 2.5.0->2.7.0, `python-dotenv` 1.2.1->1.2.2,
+  `pygments` 2.19.2->2.20.0. (`python-multipart` is no longer a resolved dependency
+  under Starlette 1.x, so its CVEs no longer apply.) No source/runtime API changes;
+  the three source-file edits are black 26 style-only trailing-comma reformatting.
+
 ---
 
 ## [0.3.1] - 2026-04-17
