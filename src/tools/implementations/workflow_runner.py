@@ -657,7 +657,7 @@ def _build_physicochemical_comparison(
 
 
 def _structure_evidence_rows(
-    structure_comparison: Dict[str, Any]
+    structure_comparison: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     target = structure_comparison.get("target", {})

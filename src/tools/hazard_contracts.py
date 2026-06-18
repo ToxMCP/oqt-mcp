@@ -25,7 +25,7 @@ def _unique(values: List[Any]) -> List[str]:
 
 
 def build_source_attribution(
-    provenance: Optional[Dict[str, Any]]
+    provenance: Optional[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
     if not isinstance(provenance, dict):
         return None

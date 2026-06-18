@@ -417,7 +417,7 @@ async def _run_agents(
 
 
 def _normalise_simulator_catalog(
-    simulators: List[Dict[str, Any]]
+    simulators: List[Dict[str, Any]],
 ) -> List[Tuple[str, str]]:
     normalised = []
     for entry in simulators or []:
