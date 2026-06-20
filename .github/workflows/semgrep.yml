@@ -1,0 +1,36 @@
+name: Semgrep SAST
+
+# Free, GHAS-independent static analysis gate (§11.1 code-SAST template).
+# Runs the Semgrep CLI directly and gates via `--error`, which exits non-zero
+# when any blocking finding is present. No SARIF upload (that path requires
+# GitHub Advanced Security); the failing job IS the gate.
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  schedule:
+    # Weekly drift catch (Mondays 06:17 UTC) so new rules / new code on main
+    # are scanned even without a PR.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: semgrep (p/python + p/secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep
+        run: pip install semgrep==1.167.0
+
+      - name: Run Semgrep (blocking gate)
+        run: semgrep scan --config p/python --config p/secrets --error --metrics=off src

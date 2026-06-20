@@ -74,10 +74,19 @@ else:
     # Update this list for production
     origins = ["https://your.mcp.host.com"]
 
+# Per the CORS spec, a wildcard origin must NOT be combined with credentialed
+# requests; disable credentials whenever the wildcard (dev-only) list is in use so
+# the dev path is actually valid/safe rather than silently broken-and-insecure.
+_allow_credentials = origins != ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    # The wildcard origin is gated to ENVIRONMENT == "development" only; production
+    # uses an explicit allowlist. Credentials are disabled (above) whenever the
+    # wildcard is active, so the dev path cannot leak credentialed cross-origin data.
+    # Owner action: replace the production placeholder host before deploying.
+    allow_origins=origins,  # nosemgrep: python.fastapi.security.wildcard-cors.wildcard-cors
+    allow_credentials=_allow_credentials,
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
