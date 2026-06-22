@@ -1,0 +1,77 @@
+name: Dependency Audit
+
+# Hardened, fail-on-ANY dependency vulnerability gate (pip-audit).
+#
+# Why a separate workflow + weekly schedule:
+#   pip-audit queries a LIVE advisory database (PyPI Advisory DB / OSV). A green
+#   main can go stale when a NEW CVE lands on an already-pinned, unchanged dep.
+#   The weekly cron re-audits the locked tree against the current advisory feed
+#   so newly disclosed advisories surface without any code change.
+#
+# Why fail-on-any (no severity filter, no "|| true"):
+#   pip-audit already exits non-zero on ANY advisory regardless of severity.
+#   `--strict` additionally fails the run on audit errors (e.g. an unreachable
+#   advisory source) instead of silently passing. This is deliberately NOT
+#   severity-gated and is NOT swallowed.
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  schedule:
+    # Weekly, Monday 06:17 UTC (off-peak). Live advisory DB => catches new CVEs
+    # landing on already-pinned deps.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Match the toolchain CI already uses (see ci.yml): Poetry 2.2.1 with an
+      # in-project virtualenv built from the committed poetry.lock.
+      - name: Upgrade Poetry toolset
+        run: pip install --upgrade "poetry>=2.2.1"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.2.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      # Install the full, locked project dependency set (runtime + dev), exactly
+      # as ci.yml does, so the audit covers what the repo actually resolves.
+      - name: Install dependencies
+        run: poetry install --no-root --with dev
+
+      # pip-audit itself is installed INTO the project venv so the audit runs in
+      # "environment" mode against the already-installed locked distributions.
+      # This avoids requirements re-resolution (which trips on env markers such
+      # as backports-asyncio-runner; python_version < "3.12") and audits exactly
+      # what is installed from poetry.lock.
+      - name: Install pip-audit
+        run: poetry run pip install "pip-audit>=2.9.0"
+
+      # Keep the runner's bundled pip current so the gate enforces the project's
+      # locked dependency set rather than a stale toolchain artifact.
+      - name: Refresh build tooling
+        run: poetry run pip install --upgrade pip
+
+      # FAIL-ON-ANY audit of the full installed dependency set.
+      #   --strict : also fail on audit errors (unreachable source, etc.)
+      #   --desc   : print advisory descriptions for triage
+      # No severity filter and no "|| true": ANY advisory turns this job RED.
+      # Note: the first-party package "o-qt-mcp-server" is not on PyPI and is
+      # skipped by pip-audit -- that is expected, not a miss.
+      - name: pip-audit (fail on any advisory)
+        run: poetry run pip-audit --strict --desc
