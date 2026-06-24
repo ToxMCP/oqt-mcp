@@ -1,0 +1,68 @@
+name: Supply-chain security
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+  schedule:
+    - cron: "19 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  python-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Poetry project and security tools
+        run: |
+          python -m pip install poetry
+          poetry install --with dev
+          poetry run python -m pip install bandit pip-audit cyclonedx-bom
+      - name: Ruff
+        run: |
+          if grep -q '^\[tool\.ruff' pyproject.toml; then poetry run ruff check .; fi
+      - name: Tests
+        run: poetry run pytest -q
+      - name: Bandit
+        run: poetry run bandit -r src -x tests
+      - name: pip-audit
+        run: poetry run pip-audit --desc
+      - name: Generate CycloneDX SBOM
+        run: |
+          mkdir -p artifacts
+          poetry run cyclonedx-py environment --output-format JSON --output-file artifacts/python-sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-sbom
+          path: artifacts/python-sbom.cdx.json
+          if-no-files-found: error
+
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          skip-dirs: .venv,dist,coverage,.pytest_cache,.ruff_cache
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
