@@ -246,7 +246,12 @@ def _build_llm_config(config: AssistantConfig) -> Dict[str, Any]:
 
 
 def _md5_bytes(data: bytes) -> str:
-    digest = hashlib.md5()
+    # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5
+    # Non-security checksum: this MD5 is a content-integrity/dedup digest exposed in the
+    # PDF artifact envelope ("md5" field) for interoperability with consumers that key
+    # artifacts by MD5. It is never used for signatures, auth, or any security boundary.
+    # usedforsecurity=False makes that intent explicit and FIPS-friendly.
+    digest = hashlib.md5(usedforsecurity=False)
     digest.update(data)
     return digest.hexdigest()
 
