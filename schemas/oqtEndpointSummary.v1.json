@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ToxMCP/oqt-mcp/blob/main/schemas/oqtEndpointSummary.v1.json",
+  "title": "O-QT Endpoint Summary v1",
+  "description": "Standalone endpoint summary record for hazard assessment. Lighter than full IUCLID OHT but OHT-inspired.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaName",
+    "schemaVersion",
+    "module",
+    "endpoint",
+    "recordCount",
+    "summaryLevel",
+    "evidenceBasis",
+    "keyFindings",
+    "studyRecords"
+  ],
+  "properties": {
+    "schemaName": {
+      "const": "oqtEndpointSummary"
+    },
+    "schemaVersion": {
+      "const": "v1"
+    },
+    "module": {
+      "const": "oqt-mcp"
+    },
+    "endpoint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rigidPath": {
+      "type": "string"
+    },
+    "recordCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "summaryLevel": {
+      "type": "string",
+      "enum": ["none", "summary", "detail"]
+    },
+    "evidenceBasis": {
+      "type": "string",
+      "enum": [
+        "experimental_data",
+        "qsar_prediction",
+        "profiler_alert",
+        "metabolism_context",
+        "mixed"
+      ]
+    },
+    "keyFindings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "keyValues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": ["number", "string", "null"]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "qualifier": {
+            "type": "string"
+          },
+          "dataType": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "studyRecords": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/endpointStudyRecord"
+      }
+    },
+    "classificationRationale": {
+      "type": "string"
+    },
+    "supportingEvidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attachment"
+      }
+    }
+  },
+  "$defs": {
+    "endpointStudyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recordId": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "rigidPath": {
+          "type": "string"
+        },
+        "dataType": {
+          "type": "string"
+        },
+        "value": {
+          "type": ["number", "string", "null"]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "qualifier": {
+          "type": "string"
+        },
+        "study": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "year": {
+          "type": "string"
+        },
+        "testType": {
+          "type": "string"
+        },
+        "methodType": {
+          "type": "string"
+        },
+        "testOrganism": {
+          "type": "string"
+        },
+        "strain": {
+          "type": "string"
+        },
+        "metabolicActivation": {
+          "type": "string"
+        },
+        "overallResult": {
+          "type": "string"
+        },
+        "referenceSource": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "sourceAttribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "guid": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "study": {
+          "type": "string"
+        },
+        "disclaimer": {
+          "type": "string"
+        },
+        "helpFile": {
+          "type": "string"
+        },
+        "position": {
+          "type": "string"
+        },
+        "additionalInfo": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sourceSystem": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "mediaType"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import json
+import zipfile
 from pathlib import Path
 
 import jsonschema
@@ -288,6 +289,29 @@ def test_build_portable_handoffs_from_grouping_log():
     assert read_across["supports"]["typedGroupingDossier"] is True
 
 
+def test_build_portable_handoffs_from_log_supports_packaged_dossier():
+    log = {
+        "identifier": "Benzene",
+        "inputs": {
+            "identifier": "Benzene",
+            "search_type": "name",
+        },
+        "errors": [],
+    }
+
+    result = asyncio.run(
+        execution.build_portable_handoffs_from_log(
+            log,
+            package_mode="packaged_dossier",
+        )
+    )
+
+    workflow_record = result["portable_handoffs"]["oqtWorkflowRecord.v1"]
+    assert workflow_record["packageSemantics"]["mode"] == "packaged_dossier"
+    assert workflow_record["packageSemantics"]["isReadOnly"] is True
+    assert workflow_record["attachments"][-1]["name"].endswith("-manifest.json")
+
+
 def test_run_profiler(monkeypatch):
     async def fake_profile(prof_guid, chem_id, simulator_guid=None):
         return {"result": "ok", "sim": simulator_guid}
@@ -348,6 +372,22 @@ def test_run_metabolism_simulator_with_smiles(monkeypatch):
     assert result["simulator_provenance"]["title"] == "Rat liver"
 
 
+def _assert_attachment_structure(att):
+    assert "name" in att
+    assert "role" in att
+    assert att["role"] in ("structured_log", "narrative_summary", "audit_report")
+    assert "fieldName" in att
+    assert att["fieldName"] != ""
+    assert "delivery" in att
+    assert "mediaType" in att
+    assert "description" in att
+    assert "sizeBytes" in att
+    assert isinstance(att["sizeBytes"], int)
+    assert att["sizeBytes"] >= 0
+    assert "checksumSha256" in att
+    assert len(att["checksumSha256"]) == 64
+
+
 def test_download_qmrf(monkeypatch):
     async def fake_qmrf(qsar_guid):
         return {"report": "qmrf"}
@@ -367,6 +407,13 @@ def test_download_qmrf(monkeypatch):
     assert result["size_bytes"] > 0
     assert result["content_type"] == "application/octet-stream"
     assert result["model_provenance"]["title"] == "Acute tox model"
+
+    assert "attachments" in result
+    assert isinstance(result["attachments"], list)
+    assert len(result["attachments"]) >= 1
+    for att in result["attachments"]:
+        _assert_attachment_structure(att)
+    assert result["attachments"][0]["fieldName"] == "qmrf_base64"
 
 
 def test_download_qsar_report(monkeypatch):
@@ -388,6 +435,12 @@ def test_download_qsar_report(monkeypatch):
     assert result["size_bytes"] > 0
     assert result["content_type"] == "application/octet-stream"
     assert result["model_provenance"]["title"] == "Acute tox model"
+
+    assert "attachments" in result
+    assert len(result["attachments"]) >= 1
+    for att in result["attachments"]:
+        _assert_attachment_structure(att)
+    assert result["attachments"][0]["fieldName"] == "report_base64"
 
 
 def test_execute_workflow(monkeypatch):
@@ -411,6 +464,89 @@ def test_download_workflow_report(monkeypatch):
     payload = json.loads(decoded)
     assert payload["comments"] == "note"
     assert result["size_bytes"] > 0
+
+    assert "attachments" in result
+    assert len(result["attachments"]) >= 1
+    for att in result["attachments"]:
+        _assert_attachment_structure(att)
+    assert result["attachments"][0]["fieldName"] == "report_base64"
+
+
+def test_download_qmrf_with_zip_payload(monkeypatch):
+    """QMRF returned as a ZIP archive produces per-member attachments."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("report.json", json.dumps({"model": "test"}))
+        zf.writestr("notes.md", "# Notes")
+        zf.writestr("report.pdf", b"%PDF-1.4 fake pdf")
+    zip_bytes = buffer.getvalue()
+
+    async def fake_qmrf(qsar_guid):
+        return zip_bytes
+
+    async def fake_model_metadata(qsar_guid):
+        return {"Guid": qsar_guid, "Name": "Acute tox model", "Donator": "EPA"}
+
+    monkeypatch.setattr(execution.qsar_client, "generate_qmrf", fake_qmrf)
+    monkeypatch.setattr(
+        execution.qsar_client, "get_model_metadata", fake_model_metadata
+    )
+
+    result = asyncio.run(execution.download_qmrf("model", "chem"))
+    assert result["content_type"] == "application/zip"
+    assert "archive_entries" in result
+    assert "attachments" in result
+
+    attachments = result["attachments"]
+    names = {att["name"] for att in attachments}
+    assert "report.json" in names
+    assert "notes.md" in names
+    assert "report.pdf" in names
+    assert "archive.zip" in names
+
+    by_name = {att["name"]: att for att in attachments}
+    assert by_name["report.json"]["role"] == "structured_log"
+    assert by_name["report.json"]["mediaType"] == "application/json"
+    assert by_name["notes.md"]["role"] == "narrative_summary"
+    assert by_name["notes.md"]["mediaType"] == "text/markdown"
+    assert by_name["report.pdf"]["role"] == "audit_report"
+    assert by_name["report.pdf"]["mediaType"] == "application/pdf"
+    assert by_name["archive.zip"]["role"] == "audit_report"
+    assert by_name["archive.zip"]["mediaType"] == "application/zip"
+
+    for att in attachments:
+        _assert_attachment_structure(att)
+        assert att["fieldName"] == "qmrf_base64"
+        if att["name"] != "archive.zip" and att["name"] != "report.pdf":
+            assert "integrityNote" in att
+
+
+def test_download_qsar_report_with_pdf_payload(monkeypatch):
+    """QSAR report returned as a raw PDF produces a single audit_report attachment."""
+    pdf_bytes = b"%PDF-1.4\nfake pdf content"
+
+    async def fake_report(chem_id, qsar_guid, comments):
+        return pdf_bytes
+
+    async def fake_model_metadata(qsar_guid):
+        return {"Guid": qsar_guid, "Name": "Acute tox model", "Donator": "EPA"}
+
+    monkeypatch.setattr(execution.qsar_client, "generate_qsar_report", fake_report)
+    monkeypatch.setattr(
+        execution.qsar_client, "get_model_metadata", fake_model_metadata
+    )
+
+    result = asyncio.run(execution.download_qsar_report("chem", "model", "note"))
+    assert result["content_type"] == "application/pdf"
+    assert "attachments" in result
+    assert len(result["attachments"]) == 1
+    att = result["attachments"][0]
+    _assert_attachment_structure(att)
+    assert att["name"] == "report.pdf"
+    assert att["role"] == "audit_report"
+    assert att["mediaType"] == "application/pdf"
+    assert att["fieldName"] == "report_base64"
+    assert att["sizeBytes"] == len(pdf_bytes)
 
 
 def test_group_chemicals(monkeypatch):

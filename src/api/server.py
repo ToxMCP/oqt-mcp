@@ -2,7 +2,7 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
-from importlib import metadata
+
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +17,7 @@ from src.utils.logging import setup_logging
 setup_logging()
 
 # Import tool implementations to ensure they register themselves with the registry
+import src.tools.implementations.export_adapters
 import src.tools.implementations.o_qt_qsar_tools
 import src.tools.implementations.toolbox_discovery
 import src.tools.implementations.toolbox_execution
@@ -27,10 +28,7 @@ from src.mcp.router import router as mcp_router
 
 log = logging.getLogger(__name__)
 
-try:
-    _app_version = metadata.version("o-qt-mcp-server")
-except metadata.PackageNotFoundError:
-    _app_version = "0.3.0"
+from src.version import APP_VERSION as _app_version
 
 
 @asynccontextmanager

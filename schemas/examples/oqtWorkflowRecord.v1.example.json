@@ -141,6 +141,25 @@
       }
     ]
   },
+  "reproducibility": {
+    "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "snapshotHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "toolchainVersions": {
+      "app": "0.3.1",
+      "python": "3.14.0",
+      "fastapi": "0.111.0",
+      "pydantic": "2.7.1",
+      "httpx": "0.27.0"
+    },
+    "upstreamVersions": {
+      "apiVersions": "6.0",
+      "serverDate": "Mon, 23 Mar 2026 09:30:00 GMT",
+      "toolboxBuildVersion": "unknown",
+      "databaseVersion": "unknown"
+    },
+    "executionTimestamp": "2026-03-23T09:30:00Z",
+    "randomSeed": null
+  },
   "notes": [
     "Workflow record prepared for downstream orchestration."
   ]

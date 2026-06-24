@@ -1,0 +1,23 @@
+{
+  "report_context": {
+    "identifier": "67-64-1",
+    "decision_context": "hazard_identification",
+    "problem_formulation": "Assess structural grouping for ketone read-across.",
+    "grouping_hypothesis": "Ketones share metabolic pathways and similar toxicological profiles.",
+    "endpoints": [
+      "Acute toxicity"
+    ]
+  },
+  "target_substance": null,
+  "source_analogues": [],
+  "excluded_analogues": [],
+  "structure_comparison": {},
+  "physicochemical_comparison": {},
+  "data_matrix": [],
+  "similarity_assessment": {},
+  "uncertainty_assessment": {},
+  "endpoint_justifications": [],
+  "recommended_follow_ups": [
+    "Resolve the target substance in the Toolbox before attempting a grouping dossier."
+  ]
+}

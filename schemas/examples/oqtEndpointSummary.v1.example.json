@@ -1,0 +1,64 @@
+{
+  "schemaName": "oqtEndpointSummary",
+  "schemaVersion": "v1",
+  "module": "oqt-mcp",
+  "endpoint": "Acute toxicity: fish LC50",
+  "rigidPath": "TOX/ECOTOX/FISH/LC50",
+  "recordCount": 2,
+  "summaryLevel": "detail",
+  "evidenceBasis": "experimental_data",
+  "keyFindings": [
+    "Overall result: Toxic",
+    "Reported value: 2.5 mg/L"
+  ],
+  "keyValues": [
+    {
+      "value": "2.5",
+      "unit": "mg/L",
+      "qualifier": "=",
+      "dataType": "LC50"
+    }
+  ],
+  "studyRecords": [
+    {
+      "recordId": "record-123",
+      "endpoint": "Acute toxicity: fish LC50",
+      "rigidPath": "TOX/ECOTOX/FISH/LC50",
+      "dataType": "LC50",
+      "value": "2.5",
+      "unit": "mg/L",
+      "qualifier": "=",
+      "testType": "Acute toxicity",
+      "methodType": "OECD 203",
+      "testOrganism": "Pimephales promelas",
+      "strain": "Fathead minnow",
+      "metabolicActivation": "not applicable",
+      "overallResult": "Toxic",
+      "referenceSource": "ECHA CHEM",
+      "database": "ECHA",
+      "metadata": {
+        "Test type": "Acute toxicity",
+        "Test organisms (species)": "Pimephales promelas",
+        "OVERALL": "Toxic"
+      }
+    }
+  ],
+  "classificationRationale": "Overall result from Toolbox endpoint study record: Toxic.",
+  "supportingEvidence": [
+    "Experimental LC50 value of 2.5 mg/L indicates acute toxicity to fish."
+  ],
+  "provenance": {
+    "sourceSystem": "OECD QSAR Toolbox WebAPI",
+    "generatedBy": "o-qt-mcp-server",
+    "generatedAt": "2026-04-17T10:00:00Z",
+    "sourceUrl": "https://github.com/ToxMCP/oqt-mcp"
+  },
+  "attachments": [
+    {
+      "name": "endpoint_study_record.json",
+      "mediaType": "application/json",
+      "sizeBytes": 1024,
+      "description": "Detailed endpoint study record payload."
+    }
+  ]
+}

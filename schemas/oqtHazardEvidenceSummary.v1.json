@@ -384,10 +384,87 @@
             "type": "string"
           }
         },
+        "keyValues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": ["number", "string", "null"]
+              },
+              "unit": {
+                "type": "string"
+              },
+              "qualifier": {
+                "type": "string"
+              },
+              "dataType": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "studyRecords": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/endpointStudyRecord"
+          }
+        },
+        "classificationRationale": {
+          "type": "string"
+        },
+        "supportingEvidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sourceSystem": {
+              "type": "string",
+              "minLength": 1
+            },
+            "generatedBy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "generatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sourceUrl": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "mediaType"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mediaType": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "description": {
+                "type": "string"
+              }
+            }
           }
         }
       }

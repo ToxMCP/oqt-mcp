@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "fileName": "readAcrossSummary.json",
+      "mediaType": "application/json",
+      "sizeBytes": 723,
+      "checksumSha256": "3890ffb2258f775307f216d3388d4047a36f2cb0122ea7250751f724f6fe0cbb"
+    },
+    {
+      "fileName": "log.json",
+      "mediaType": "application/json",
+      "sizeBytes": 2270,
+      "checksumSha256": "3ad47cfb3d348958570b741a9f5a6af1be8e39f2fabcd900427225337192c987"
+    },
+    {
+      "fileName": "summary.md",
+      "mediaType": "text/markdown",
+      "sizeBytes": 133,
+      "checksumSha256": "281c859b2f8099f84328c89f2e24ce3ece5124c8c012e7c09387684086fb698f"
+    },
+    {
+      "fileName": "report.pdf",
+      "mediaType": "application/pdf",
+      "sizeBytes": 6396,
+      "checksumSha256": "f9a527769aa27c08fda7924d934f85ba11d4dad54989ebafb3e3125cf7c0ca30"
+    }
+  ]
+}

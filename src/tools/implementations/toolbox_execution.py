@@ -1,10 +1,11 @@
 import base64
+import hashlib
 import inspect
 import io
 import json
 import logging
 import zipfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -31,13 +32,44 @@ def _ensure_bytes(payload: Optional[object]) -> bytes:
     raise TypeError("Unexpected binary payload type")
 
 
+def _media_type_and_role_for_filename(name: str) -> tuple[str, str]:
+    """Infer (media_type, role) from a file name extension."""
+    lower = name.lower()
+    if lower.endswith(".json"):
+        return "application/json", "structured_log"
+    if lower.endswith(".md"):
+        return "text/markdown", "narrative_summary"
+    if lower.endswith(".txt"):
+        return "text/plain", "narrative_summary"
+    if lower.endswith(".pdf"):
+        return "application/pdf", "audit_report"
+    if lower.endswith(".zip"):
+        return "application/zip", "audit_report"
+    return "application/octet-stream", "audit_report"
+
+
 def _describe_binary_artifact(payload: bytes) -> Dict[str, Any]:
     description: Dict[str, Any] = {
         "size_bytes": len(payload),
         "content_type": "application/octet-stream",
     }
+    attachments: List[Dict[str, Any]] = []
+
     if payload.startswith(b"%PDF"):
         description["content_type"] = "application/pdf"
+        attachments.append(
+            {
+                "name": "report.pdf",
+                "role": "audit_report",
+                "fieldName": "",
+                "delivery": "inline",
+                "mediaType": "application/pdf",
+                "description": "PDF report.",
+                "sizeBytes": len(payload),
+                "checksumSha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+        description["attachments"] = attachments
         return description
 
     buffer = io.BytesIO(payload)
@@ -55,7 +87,75 @@ def _describe_binary_artifact(payload: bytes) -> Dict[str, Any]:
                     archive.read(pdf_name)
                 ).decode("utf-8")
                 description["primary_pdf_entry"] = pdf_name
+
+            # Build attachments for every ZIP member
+            for member_name in names:
+                member_bytes = archive.read(member_name)
+                media_type, role = _media_type_and_role_for_filename(member_name)
+                attachments.append(
+                    {
+                        "name": member_name,
+                        "role": role,
+                        "fieldName": "",
+                        "delivery": "inline",
+                        "mediaType": media_type,
+                        "description": f"Archive member: {member_name}",
+                        "sizeBytes": len(member_bytes),
+                        "checksumSha256": hashlib.sha256(member_bytes).hexdigest(),
+                    }
+                )
+            # Container entry for the ZIP itself
+            attachments.append(
+                {
+                    "name": "archive.zip",
+                    "role": "audit_report",
+                    "fieldName": "",
+                    "delivery": "inline",
+                    "mediaType": "application/zip",
+                    "description": "ZIP archive containing report bundle.",
+                    "sizeBytes": len(payload),
+                    "checksumSha256": hashlib.sha256(payload).hexdigest(),
+                }
+            )
+        description["attachments"] = attachments
+        return description
+
+    # Fallback for other binary payloads
+    attachments.append(
+        {
+            "name": "binary.bin",
+            "role": "audit_report",
+            "fieldName": "",
+            "delivery": "inline",
+            "mediaType": "application/octet-stream",
+            "description": "Binary payload.",
+            "sizeBytes": len(payload),
+            "checksumSha256": hashlib.sha256(payload).hexdigest(),
+        }
+    )
+    description["attachments"] = attachments
     return description
+
+
+def _inject_attachment_context(
+    attachments: List[Dict[str, Any]],
+    field_name: str,
+    container_description: str,
+) -> List[Dict[str, Any]]:
+    """Fill in fieldName, description, and integrityNote on attachment entries."""
+    result: List[Dict[str, Any]] = []
+    for att in attachments:
+        clone = dict(att)
+        clone["fieldName"] = field_name
+        clone["delivery"] = "inline"
+        if clone.get("name") == "archive.zip":
+            clone["description"] = container_description
+        else:
+            clone["description"] = f"{clone.get('description', 'Attachment')} from Toolbox response."
+            if clone.get("name") != "report.pdf":
+                clone["integrityNote"] = f"Member of ZIP archive at fieldName '{field_name}'."
+        result.append(clone)
+    return result
 
 
 def _format_meta(label: str, meta: Dict[str, Any]) -> Dict[str, Any]:
@@ -235,6 +335,18 @@ class PortableHandoffsFromLogParams(BaseModel):
         None,
         description="Optional status override (`ok`, `partial`, `not_found`, `error`) when the caller wants to pin the exported contract state.",
     )
+    package_mode: str = Field(
+        "working_bundle",
+        description="Package semantics mode: `working_bundle` (live MCP) or `packaged_dossier` (frozen export).",
+    )
+
+    @model_validator(mode="after")
+    def normalise_package_mode(self):
+        value = str(self.package_mode or "working_bundle").strip().lower()
+        self.package_mode = (
+            value if value in {"working_bundle", "packaged_dossier"} else "working_bundle"
+        )
+        return self
 
 
 async def run_qsar_model(qsar_guid: str, chem_id: str) -> dict:
@@ -364,12 +476,18 @@ async def download_qmrf(qsar_guid: str, chem_id: str) -> dict:
     model_provenance, model_meta = await _fetch_model_provenance(qsar_guid)
     qmrf_bytes = _ensure_bytes(payload)
     encoded = base64.b64encode(qmrf_bytes).decode("utf-8")
+    artifact_info = _describe_binary_artifact(qmrf_bytes)
     result = {
         "qsar_guid": qsar_guid,
         "chem_id": chem_id,
         "qmrf_base64": encoded,
-        **_describe_binary_artifact(qmrf_bytes),
+        **artifact_info,
     }
+    result["attachments"] = _inject_attachment_context(
+        artifact_info.get("attachments", []),
+        field_name="qmrf_base64",
+        container_description="QMRF report archive retrieved from Toolbox.",
+    )
     if model_provenance:
         result["model_provenance"] = model_provenance
     toolbox_meta = _aggregate_meta(
@@ -392,12 +510,18 @@ async def download_qsar_report(
     model_provenance, model_meta = await _fetch_model_provenance(qsar_guid)
     pdf_bytes = _ensure_bytes(payload)
     encoded = base64.b64encode(pdf_bytes).decode("utf-8")
+    artifact_info = _describe_binary_artifact(pdf_bytes)
     result = {
         "chem_id": chem_id,
         "qsar_guid": qsar_guid,
         "report_base64": encoded,
-        **_describe_binary_artifact(pdf_bytes),
+        **artifact_info,
     }
+    result["attachments"] = _inject_attachment_context(
+        artifact_info.get("attachments", []),
+        field_name="report_base64",
+        container_description="QSAR report retrieved from Toolbox.",
+    )
     if model_provenance:
         result["model_provenance"] = model_provenance
     toolbox_meta = _aggregate_meta(
@@ -438,12 +562,18 @@ async def download_workflow_report(
         raise
     pdf_bytes = _ensure_bytes(payload)
     encoded = base64.b64encode(pdf_bytes).decode("utf-8")
+    artifact_info = _describe_binary_artifact(pdf_bytes)
     result = {
         "chem_id": chem_id,
         "workflow_guid": workflow_guid,
         "report_base64": encoded,
-        **_describe_binary_artifact(pdf_bytes),
+        **artifact_info,
     }
+    result["attachments"] = _inject_attachment_context(
+        artifact_info.get("attachments", []),
+        field_name="report_base64",
+        container_description="Workflow report retrieved from Toolbox.",
+    )
     toolbox_meta = _aggregate_meta(
         _format_meta("report/workflow", meta),
     )
@@ -532,10 +662,13 @@ async def render_pdf_from_log(log: dict, filename: Optional[str] = None) -> dict
 
 
 async def build_portable_handoffs_from_log(
-    log: dict, workflow_type: str = "auto", status: Optional[str] = None
+    log: dict,
+    workflow_type: str = "auto",
+    status: Optional[str] = None,
+    package_mode: str = "working_bundle",
 ) -> dict:
     return workflow_runner.build_portable_handoffs_from_log_bundle(
-        log, workflow_type=workflow_type, status=status
+        log, workflow_type=workflow_type, status=status, package_mode=package_mode
     )
 
 

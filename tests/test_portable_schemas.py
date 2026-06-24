@@ -24,6 +24,10 @@ SCHEMA_EXAMPLES = [
         ROOT / "schemas" / "oqtReadAcrossSummary.v1.json",
         ROOT / "schemas" / "examples" / "oqtReadAcrossSummary.v1.example.json",
     ),
+    (
+        ROOT / "schemas" / "oqtEndpointSummary.v1.json",
+        ROOT / "schemas" / "examples" / "oqtEndpointSummary.v1.example.json",
+    ),
 ]
 
 

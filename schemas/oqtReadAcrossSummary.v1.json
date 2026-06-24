@@ -403,6 +403,12 @@
         },
         "reference": {
           "type": "string"
+        },
+        "quantitativeMetrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/quantitativeMetric"
+          }
         }
       }
     },
@@ -471,6 +477,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "quantitativeMetrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/quantitativeMetric"
+          }
         }
       }
     },
@@ -496,6 +508,35 @@
           "enum": ["low", "medium", "high"]
         },
         "comments": {
+          "type": "string"
+        },
+        "quantitativeMetrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/quantitativeMetric"
+          }
+        }
+      }
+    },
+    "quantitativeMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "thresholdRuleRef": {
+          "type": "string"
+        },
+        "interpretation": {
           "type": "string"
         }
       }
