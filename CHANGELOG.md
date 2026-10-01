@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-01
+
 ## [0.3.2] - Unreleased maintenance candidate
 
 ### Added
@@ -100,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dockerfile and docker-compose stack for local development with Toolbox API stub.
 - Taskmaster backlog, documentation set (`docs/auth_testing.md`, `docs/observability.md`, `docs/testing.md`), and CI workflow skeleton.
 
-[Unreleased]: https://github.com/ToxMCP/oqt-mcp/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ToxMCP/oqt-mcp/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ToxMCP/oqt-mcp/releases/tag/v0.2.0
