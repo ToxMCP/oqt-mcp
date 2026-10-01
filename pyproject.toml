@@ -1,6 +1,6 @@
 [project]
 name = "o-qt-mcp-server"
-version = "0.3.0"
+version = "0.3.2"
 description = "Specialized MCP workflow engine for the OECD QSAR Toolbox inside the ToxMCP suite"
 readme = "README.md"
 license = "Apache-2.0"
@@ -17,9 +17,11 @@ dependencies = [
     "authlib>=1.6.12,<2.0.0",
     "httpx>=0.28.0,<1.0.0",
     # Transitive-dependency floors pinned to clear known CVEs (see CHANGELOG).
-    "cryptography>=48.0.1,<49.0.0",
+  "cryptography>=50.0.1,<51.0.0",
+  "anyio>=4.14.2,<5.0.0",
+  "click>=8.3.3,<9.0.0",
     "idna>=3.15,<4.0.0",
-    "urllib3>=2.7.0,<3.0.0",
+  "urllib3>=2.8.0,<3.0.0",
     "python-dotenv>=1.2.2,<2.0.0",
 ]
 

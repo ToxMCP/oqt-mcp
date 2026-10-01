@@ -5,7 +5,7 @@ from threading import Lock
 from typing import Any, Dict
 
 import httpx
-from authlib.jose import JoseError, jwt
+from authlib.jose import JoseError, JsonWebToken
 from fastapi import HTTPException, Request, status
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
@@ -82,7 +82,7 @@ def _store_jwks(payload: dict) -> dict:
 def get_jwks(force_refresh: bool = False) -> dict:
     """
     Fetches and caches the JSON Web Key Set (JWKS).
-    Falls back to the last known keys if refresh fails.
+    Falls back to the last known keys for at most one additional cache TTL.
     """
     if not JWKS_URI:
         raise RuntimeError("JWKS_URI is not configured.")
@@ -102,7 +102,12 @@ def get_jwks(force_refresh: bool = False) -> dict:
         except Exception as e:
             log.error(f"An unexpected error occurred while fetching JWKS: {e}")
 
-        if _jwks_cache["data"]:
+        expires_at = _jwks_cache.get("expires_at")
+        if (
+            _jwks_cache["data"]
+            and expires_at
+            and datetime.utcnow() < expires_at + _cache_ttl()
+        ):
             log.warning("Using cached JWKS due to fetch failure.")
             return _jwks_cache["data"]
 
@@ -119,12 +124,14 @@ def _sanitize_error(err: Exception) -> str:
 
 def _decode_token(token: str, force_refresh: bool = False) -> Dict[str, Any]:
     jwks = get_jwks(force_refresh=force_refresh)
-    claims = jwt.decode(
+    claims = JsonWebToken(OIDC_ALGORITHMS).decode(
         token,
         jwks,
         claims_options={
             "iss": {"essential": True, "value": OIDC_ISSUER},
             "aud": {"essential": True, "value": OIDC_AUDIENCE},
+            "exp": {"essential": True},
+            "sub": {"essential": True},
         },
     )
     if hasattr(claims, "validate"):

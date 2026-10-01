@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - Unreleased maintenance candidate
+
 ### Added
 - _TBD_
 
@@ -14,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - _TBD_
 
 ### Fixed
-- _TBD_
+- Enforce the configured JWT algorithm allowlist and require expiration and subject claims.
+- Bound JWKS outage fallback to one extra cache TTL instead of accepting stale keys indefinitely.
 
 ### Security
+- Raise AnyIO, cryptography, Click, and urllib3 minimum versions and refresh the Poetry lock against the current advisory database.
 - **Dependency vulnerability remediation.** Bumped dependencies to clear all 37 known
   vulnerabilities (11 packages) reported by `pip-audit`; a fresh audit now reports
   zero. Direct deps raised: `authlib` 1.6.5->1.7.2, `fastapi` 0.111.1->0.137.2
