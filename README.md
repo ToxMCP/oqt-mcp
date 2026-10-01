@@ -66,6 +66,15 @@ See [docs/architecture.md](docs/architecture.md) for the fuller boundary and con
 See [docs/oecd_alignment_review_2025.md](docs/oecd_alignment_review_2025.md) for the OECD 2025 grouping/IUCLID gap analysis and the next contract-focused improvements.
 See [docs/cross_suite_alignment_2026.md](docs/cross_suite_alignment_2026.md) for the public contract patterns adopted into O-QT.
 
+## Maintenance Candidate v0.3.2
+
+The next patch enforces configured token algorithms and expiration claims,
+bounds reuse of cached signing keys during outages, and refreshes affected
+dependencies. Report provenance and runtime version fallbacks now match the
+package metadata. See [the candidate release notes](docs/releases/v0.3.2.md)
+for validation and the remaining release checks. This candidate is not yet a
+published release.
+
 ## What's New In v0.3.1
 
 This release focuses on audit remediation and scientific governance controls.

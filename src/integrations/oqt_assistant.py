@@ -246,7 +246,8 @@ def _build_llm_config(config: AssistantConfig) -> Dict[str, Any]:
 
 
 def _md5_bytes(data: bytes) -> str:
-    digest = hashlib.md5()
+    # Retained for legacy report metadata; it is not an authenticity check.
+    digest = hashlib.md5(usedforsecurity=False)
     digest.update(data)
     return digest.hexdigest()
 
@@ -771,4 +772,5 @@ def encode_pdf(pdf_bytes: bytes) -> Dict[str, Any]:
         "base64": encoded,
         "size_bytes": len(pdf_bytes or b""),
         "md5": _md5_bytes(pdf_bytes or b""),
+        "sha256": hashlib.sha256(pdf_bytes or b"").hexdigest(),
     }

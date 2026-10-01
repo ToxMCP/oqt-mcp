@@ -19,9 +19,9 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # Weekly, Monday 06:17 UTC (off-peak). Live advisory DB => catches new CVEs
+    # Weekly, Monday 06:23 UTC (off-peak). Live advisory DB => catches new CVEs
     # landing on already-pinned deps.
-    - cron: "17 6 * * 1"
+    - cron: "23 6 * * 1"
   workflow_dispatch:
 
 permissions:

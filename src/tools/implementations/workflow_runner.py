@@ -44,7 +44,7 @@ TOOLBOX_SOURCE_SYSTEM = "OECD QSAR Toolbox WebAPI"
 TOOLBOX_COMPATIBILITY_NOTE = (
     "Targets OECD QSAR Toolbox WebAPI /api/v6 compatibility routes."
 )
-GENERATED_BY_VERSION = "O-QT MCP Server v0.3.0"
+GENERATED_BY_VERSION = "O-QT MCP Server v0.3.2"
 
 
 def _looks_like_uuid(value: Any) -> bool:

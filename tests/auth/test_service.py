@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime, timedelta
 
 import httpx
@@ -69,6 +70,23 @@ def test_get_jwks_returns_stale_on_failure(monkeypatch):
 
 
 def test_get_jwks_raises_when_no_cache(monkeypatch):
+    def failing_get(url, timeout):
+        raise httpx.ConnectError("boom", request=_httpx_request())
+
+    monkeypatch.setattr(auth_service.httpx, "get", failing_get)
+
+    with pytest.raises(HTTPException) as exc:
+        auth_service.get_jwks(force_refresh=True)
+
+    assert exc.value.status_code == 503
+
+
+def test_get_jwks_rejects_cache_beyond_fallback_window(monkeypatch):
+    auth_service._jwks_cache["data"] = {"keys": [{"kid": "retired"}]}
+    auth_service._jwks_cache["expires_at"] = (
+        datetime.utcnow() - auth_service._cache_ttl() - timedelta(seconds=1)
+    )
+
     def failing_get(url, timeout):
         raise httpx.ConnectError("boom", request=_httpx_request())
 
@@ -178,6 +196,7 @@ def test_decode_token_with_real_jwks(monkeypatch):
         "custom": {"claim": {"roles": ["RESEARCHER"]}},
         "iss": "https://issuer.example.com",
         "aud": "aud",
+        "exp": int(time.time()) + 300,
     }
     token = jwt.encode({"alg": "RS256", "kid": "dev-key"}, claims, key).decode("utf-8")
     monkeypatch.setattr(
@@ -187,3 +206,74 @@ def test_decode_token_with_real_jwks(monkeypatch):
     decoded = auth_service._decode_token(token)
     assert decoded["sub"] == "user|42"
     assert auth_service._extract_roles(decoded) == ["RESEARCHER"]
+
+
+@pytest.fixture
+def signed_token(monkeypatch):
+    key = JsonWebKey.generate_key(
+        "RSA", 2048, is_private=True, options={"kid": "test-key"}
+    )
+    monkeypatch.setattr(auth_service, "OIDC_ISSUER", "https://issuer.example.com")
+    monkeypatch.setattr(auth_service, "OIDC_AUDIENCE", "aud")
+    monkeypatch.setattr(auth_service, "OIDC_ALGORITHMS", ["RS256"])
+    monkeypatch.setattr(
+        auth_service,
+        "get_jwks",
+        lambda force_refresh=False: {"keys": [key.as_dict(is_private=False)]},
+    )
+
+    def encode(overrides=None, omitted=None, algorithm="RS256"):
+        claims = {
+            "iss": "https://issuer.example.com",
+            "aud": "aud",
+            "sub": "user|42",
+            "exp": int(time.time()) + 300,
+        }
+        claims.update(overrides or {})
+        for claim in omitted or []:
+            claims.pop(claim, None)
+        return jwt.encode({"alg": algorithm, "kid": "test-key"}, claims, key).decode(
+            "utf-8"
+        )
+
+    return encode
+
+
+def test_decode_token_rejects_algorithm_outside_allowlist(signed_token):
+    with pytest.raises(JoseError):
+        auth_service._decode_token(signed_token(algorithm="RS384"))
+
+
+@pytest.mark.parametrize("claim", ["exp", "sub", "iss", "aud"])
+def test_decode_token_requires_claims(signed_token, claim):
+    with pytest.raises(JoseError):
+        auth_service._decode_token(signed_token(omitted=[claim]))
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"iss": "https://other-issuer.example.com"},
+        {"aud": "other-audience"},
+        {"exp": 1},
+        {"nbf": 9999999999},
+    ],
+)
+def test_decode_token_rejects_invalid_claims(signed_token, overrides):
+    with pytest.raises(JoseError):
+        auth_service._decode_token(signed_token(overrides=overrides))
+
+
+def test_get_current_user_rejects_missing_expiration(
+    monkeypatch, dummy_request, configure_auth, signed_token
+):
+    token = signed_token(omitted=["exp"])
+
+    async def scheme(request):
+        return token
+
+    monkeypatch.setattr(auth_service, "_oauth2_scheme", scheme)
+    with pytest.raises(HTTPException) as exc:
+        _run_async(auth_service.get_current_user(dummy_request))
+    assert exc.value.status_code == 401
+    assert exc.value.headers == {"WWW-Authenticate": "Bearer"}

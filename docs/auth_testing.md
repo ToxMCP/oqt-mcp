@@ -16,6 +16,12 @@ Configure these values in `.env` (or your deployment secrets):
 
 During server startup, `validate_oidc_configuration()` ensures issuer, audience, and JWKS URI are present when `BYPASS_AUTH=false`. Missing values will halt the application to prevent an insecure deployment.
 
+Token verification enforces `AUTH_OIDC_ALGORITHMS` and requires `iss`, `aud`,
+`sub`, and `exp`. Tokens without expiration are rejected. If a JWKS refresh
+fails, cached keys may be reused for one additional cache TTL; after that the
+server returns HTTP 503 until it can retrieve current keys. With the default
+TTL, keys are usable for at most 600 seconds after their last successful fetch.
+
 ## Development Bypass
 
 Setting `BYPASS_AUTH=true` returns a synthetic user (`sub=dev|bypass`, role `SYSTEM_BYPASS`). Use this only for local development. The startup log emits a warning whenever bypass mode is active.
@@ -26,13 +32,15 @@ The test suite includes helpers that create RSA keys and tokens using Authlib:
 
 ```python
 from authlib.jose import JsonWebKey, jwt
+import time
 
-key = JsonWebKey.generate_key("RSA", 2048, is_private=True, kid="dev-key")
+key = JsonWebKey.generate_key("RSA", 2048, is_private=True, options={"kid": "dev-key"})
 claims = {
     "sub": "user|123",
     "roles": ["RESEARCHER"],
     "iss": "https://issuer.example.com",
     "aud": "aud",
+    "exp": int(time.time()) + 300,
 }
 token = jwt.encode({"alg": "RS256", "kid": "dev-key"}, claims, key)
 ```

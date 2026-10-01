@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 try:
     _app_version = metadata.version("o-qt-mcp-server")
 except metadata.PackageNotFoundError:
-    _app_version = "0.3.0"
+    _app_version = "0.3.2"
 
 
 @asynccontextmanager
@@ -169,4 +169,4 @@ if __name__ == "__main__":
     import uvicorn
 
     # For local development execution
-    uvicorn.run("src.api.server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("src.api.server:app", host="127.0.0.1", port=8000, reload=True)

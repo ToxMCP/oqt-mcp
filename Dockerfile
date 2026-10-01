@@ -7,7 +7,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry (pin version for reproducibility)
-ARG POETRY_VERSION=1.8.4
+ARG POETRY_VERSION=2.2.1
 RUN pip install "poetry==${POETRY_VERSION}"
 
 # Set working directory
