@@ -21,16 +21,18 @@ import src.tools.implementations.o_qt_qsar_tools
 import src.tools.implementations.toolbox_discovery
 import src.tools.implementations.toolbox_execution
 import src.tools.implementations.workflow_runner
+from src.mcp.body_limit import MCPBodyLimitMiddleware
 
 # Import routers
 from src.mcp.router import router as mcp_router
+from src.mcp.sdk2 import create_sdk_http_app
 
 log = logging.getLogger(__name__)
 
 try:
     _app_version = metadata.version("o-qt-mcp-server")
 except metadata.PackageNotFoundError:
-    _app_version = "0.3.2"
+    _app_version = "0.4.0"
 
 
 @asynccontextmanager
@@ -52,7 +54,9 @@ async def lifespan(app: FastAPI):
         if not settings.security.BYPASS_AUTH:
             raise
     try:
-        yield
+        app.state.sdk2_app = create_sdk_http_app()
+        async with app.state.sdk2_app.router.lifespan_context(app.state.sdk2_app):
+            yield
     finally:
         log.info("O-QT MCP Server shutting down...")
 
@@ -62,6 +66,10 @@ app = FastAPI(
     description="Model Context Protocol Server for the OECD QSAR Toolbox. Built for security and interoperability.",
     version=_app_version,
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    MCPBodyLimitMiddleware, max_bytes=settings.security.MCP_MAX_REQUEST_BYTES
 )
 
 # --- Middleware ---
@@ -79,7 +87,15 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["POST", "GET", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "MCP-Protocol-Version",
+        "Mcp-Method",
+        "Mcp-Name",
+        "Mcp-Session-Id",
+        "Last-Event-ID",
+    ],
 )
 
 

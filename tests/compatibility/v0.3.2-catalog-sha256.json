@@ -1,0 +1,23 @@
+{
+  "baselineCommit": "5894a2e43712780523ff0230d39e930254f38ec5",
+  "roles": {
+    "GUEST": {
+      "tools": 21,
+      "sha256": "11f7f56117027aae75680429b4a098257fbe60bdcf6364f0b0d207422142afbe"
+    },
+    "RESEARCHER": {
+      "tools": 32,
+      "sha256": "2c55f19ea63bec2279edd5f3700aaa69e34feb18844ea3d5a183442430f1ef76"
+    },
+    "LAB_ADMIN": {
+      "tools": 32,
+      "sha256": "2c55f19ea63bec2279edd5f3700aaa69e34feb18844ea3d5a183442430f1ef76"
+    },
+    "SYSTEM_BYPASS": {
+      "tools": 32,
+      "sha256": "2c55f19ea63bec2279edd5f3700aaa69e34feb18844ea3d5a183442430f1ef76"
+    }
+  },
+  "tools": 32,
+  "sha256": "2c55f19ea63bec2279edd5f3700aaa69e34feb18844ea3d5a183442430f1ef76"
+}

@@ -66,14 +66,13 @@ See [docs/architecture.md](docs/architecture.md) for the fuller boundary and con
 See [docs/oecd_alignment_review_2025.md](docs/oecd_alignment_review_2025.md) for the OECD 2025 grouping/IUCLID gap analysis and the next contract-focused improvements.
 See [docs/cross_suite_alignment_2026.md](docs/cross_suite_alignment_2026.md) for the public contract patterns adopted into O-QT.
 
-## Maintenance Candidate v0.3.2
+## SDK2 Migration Candidate v0.4.0
 
-The next patch enforces configured token algorithms and expiration claims,
-bounds reuse of cached signing keys during outages, and refreshes affected
-dependencies. Report provenance and runtime version fallbacks now match the
-package metadata. See [the candidate release notes](docs/releases/v0.3.2.md)
-for validation and the remaining release checks. This candidate is not yet a
-published release.
+This **unreleased candidate** adds stable MCP Python SDK 2.2.0 and protocol `2026-07-28` on the existing `/mcp` endpoint, plus authenticated local stdio through `python -m src.mcp.sdk2`. Published v0.3.2 clients keep their existing HTTP handshake and aliases until a separate rollout is approved.
+
+All 32 researcher tools, role-filtered discovery, OIDC validation, privacy-aware audit, applicability-domain warnings and human review checkpoints remain. Modern catalogs use private zero-TTL cache hints so permissions are checked each time. Configure Host/Origin allowlists before public hosting; both HTTP parsers enforce a configurable 4 MiB request limit. Python 3.10 remains supported.
+
+See the [migration and hosting guide](docs/mcp_sdk2.md) and [candidate release notes](docs/releases/v0.4.0.md). This repository continues to ship as source/container; its Poetry package mode remains disabled.
 
 ## What's New In v0.3.1
 

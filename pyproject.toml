@@ -1,6 +1,6 @@
 [project]
 name = "o-qt-mcp-server"
-version = "0.3.2"
+version = "0.4.0"
 description = "Specialized MCP workflow engine for the OECD QSAR Toolbox inside the ToxMCP suite"
 readme = "README.md"
 license = "Apache-2.0"
@@ -9,6 +9,7 @@ authors = [
 ]
 requires-python = ">=3.10,<4.0"
 dependencies = [
+    "mcp==2.2.0",
     "fastapi>=0.118.0,<1.0.0",
     "uvicorn[standard]>=0.34.0,<1.0.0",
     "pydantic>=2.9.0,<3.0.0",
@@ -54,6 +55,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 88
+target-version = ["py310"]
 
 [tool.isort]
 profile = "black"
