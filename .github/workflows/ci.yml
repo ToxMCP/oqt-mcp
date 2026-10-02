@@ -33,3 +33,42 @@ jobs:
         env:
           PYTHONPATH: src
         run: poetry run python -m pytest
+
+  protocol-clients:
+    name: Source SDK1/SDK2 clients (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install locked source runtime
+        run: |
+          pip install "poetry==2.2.1" "uv==0.12.21"
+          poetry config virtualenvs.in-project true
+          poetry install --no-root --with dev
+          uv sync --locked --project tests/compatibility/legacy-client
+      - name: Verify all four real-client combinations outside checkout
+        run: |
+          cd "$RUNNER_TEMP"
+          "$GITHUB_WORKSPACE/.venv/bin/python" "$GITHUB_WORKSPACE/scripts/verify_protocol_clients.py" \
+            --server-python "$GITHUB_WORKSPACE/.venv/bin/python" \
+            --server-root "$GITHUB_WORKSPACE" \
+            --legacy-python "$GITHUB_WORKSPACE/tests/compatibility/legacy-client/.venv/bin/python" \
+            --output-dir "$RUNNER_TEMP/oqt-client-results"
+
+  container:
+    name: Source container packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build existing non-root runtime image
+        run: docker build -t oqt-sdk2-candidate .
+      - name: Verify SDK2 and role catalog in the image
+        run: |
+          docker run --rm -e AUTH_OIDC_ISSUER=https://fixture-issuer.example -e AUTH_OIDC_AUDIENCE=fixture-audience \
+            --entrypoint python oqt-sdk2-candidate -c 'from importlib.metadata import version; from src.api.server import app; from src.auth.service import User; from src.tools.registry import tool_registry; assert version("mcp")=="2.2.0"; assert len(tool_registry.list_definitions(User(sub="fixture",roles=["RESEARCHER"])))==32; assert app.state is not None'

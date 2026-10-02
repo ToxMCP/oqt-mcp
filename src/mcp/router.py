@@ -43,7 +43,7 @@ SERVER_CAPABILITIES = {
 try:
     _server_version = metadata.version("o-qt-mcp-server")
 except metadata.PackageNotFoundError:
-    _server_version = "0.3.2"
+    _server_version = "0.4.0"
 
 SERVER_INFO = ServerInfo(name="O-QT MCP Server", version=_server_version)
 
@@ -78,6 +78,18 @@ async def mcp_endpoint(request: Request, response: Response):
                 else "Parse error: Invalid JSON received."
             )
             return create_error_response(error_code, error_message, None)
+
+        from src.mcp.sdk2 import SDKResponse, is_modern_request
+
+        if is_modern_request(request, body):
+            if body.get("method") not in {
+                "server/discover",
+                "ping",
+                "initialize",
+                "notifications/initialized",
+            }:
+                request.state.sdk2_user = await get_current_user(request)
+            return SDKResponse(request.app.state.sdk2_app, await request.body())
 
         # 2. Validate JSON-RPC Structure
         try:

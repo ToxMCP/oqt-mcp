@@ -56,7 +56,7 @@ class PrivacyLogFilter(logging.Filter):
         return True
 
 
-def setup_logging():
+def setup_logging(stream=None):
     """Configures structured JSON logging (Section 3.3)."""
     logger = logging.getLogger()
 
@@ -71,7 +71,7 @@ def setup_logging():
         logger.handlers = []
 
     # Create a stream handler for stdout
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stdout if stream is None else stream)
 
     # Use JSON formatter for structured logging
     # This is crucial for observability and audit trails (Section 2.3)

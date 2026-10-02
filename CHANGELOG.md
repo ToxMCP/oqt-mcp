@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - Unreleased SDK2 candidate
+
+- Add stable MCP 2.2.0 modern HTTP and authenticated dual-generation stdio while retaining released HTTP handshakes and aliases.
+- Delegate to existing OIDC, role checks, privacy audit and scientific workflow handlers, including out-of-domain warnings and human review checkpoints.
+- Add private zero-TTL role-filtered discovery, configurable modern Host/Origin allowlists and 4 MiB streamed/declared body limits for both parsers.
+- Gate actual SDK1/SDK2 clients, source deployment and container packaging in CI. Preserve Python 3.10 and source/container distribution.
+
 ## [0.3.2] - 2026-10-01
 
 ## [0.3.2] - Unreleased maintenance candidate

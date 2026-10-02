@@ -1,0 +1,44 @@
+{
+  "calls": [
+    {
+      "label": "search",
+      "name": "search_chemicals",
+      "arguments": {
+        "query": "Ethanol",
+        "search_type": "name"
+      }
+    },
+    {
+      "label": "metadata",
+      "name": "get_public_qsar_model_info",
+      "arguments": {
+        "model_id": "fixture-model"
+      }
+    },
+    {
+      "label": "out-of-domain",
+      "name": "run_qsar_prediction",
+      "arguments": {
+        "smiles": "CCO",
+        "model_id": "fixture-model"
+      }
+    },
+    {
+      "label": "human-review",
+      "name": "run_oqt_multiagent_workflow",
+      "arguments": {
+        "identifier": "Ethanol",
+        "qsar_guids": [
+          "fixture-model"
+        ],
+        "require_human_review": true,
+        "workflow_id": "fixture-review"
+      }
+    },
+    {
+      "label": "endpoints",
+      "name": "get_endpoint_tree",
+      "arguments": {}
+    }
+  ]
+}

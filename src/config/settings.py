@@ -2,6 +2,7 @@ import os
 from functools import lru_cache
 from typing import List, Optional
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,11 @@ class SecuritySettings(BaseSettings):
 
     # Development bypass
     BYPASS_AUTH: bool = False
+
+    MCP_ALLOWED_HOSTS: Optional[str] = None
+    MCP_ALLOWED_ORIGINS: Optional[str] = None
+    MCP_MAX_REQUEST_BYTES: int = Field(default=4 * 1024 * 1024, gt=0)
+    MCP_STDIO_BEARER_TOKEN: Optional[SecretStr] = None
 
     # RBAC
     TOOL_PERMISSIONS_FILE: Optional[str] = None

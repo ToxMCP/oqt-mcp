@@ -33,7 +33,7 @@ from src.tools.registry import tool_registry
 log = logging.getLogger(__name__)
 
 _TOOLBOX_SOURCE_SYSTEM = "OECD QSAR Toolbox WebAPI"
-_GENERATED_BY_VERSION = "O-QT MCP Server v0.3.2"
+_GENERATED_BY_VERSION = "O-QT MCP Server v0.4.0"
 _TOXMCP_REPOSITORY_URL = "https://github.com/ToxMCP/oqt-mcp"
 _TOOLBOX_COMPATIBILITY_NOTE = (
     "Current WebAPI client targets /api/v6 compatibility routes."
