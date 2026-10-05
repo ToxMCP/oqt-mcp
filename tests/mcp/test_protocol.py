@@ -7,6 +7,17 @@ from src.api.server import app
 from src.mcp.protocol import INVALID_REQUEST, JSONRPCRequest, JSONRPCResponse
 
 
+def test_legacy_initialize_omits_unimplemented_capabilities():
+    client = TestClient(app)
+    response = client.post("/mcp", json={
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {"protocolVersion": "2025-03-26", "capabilities": {},
+                   "clientInfo": {"name": "legacy-discovery-regression", "version": "1.0"}},
+    })
+    assert response.status_code == 200
+    assert set(response.json()["result"]["capabilities"]) == {"tools", "prompts"}
+
+
 def test_jsonrpc_request_rejects_boolean_id():
     with pytest.raises(ValueError):
         JSONRPCRequest(method="initialize", id=True)

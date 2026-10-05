@@ -216,7 +216,11 @@ def handle_initialize(params: dict) -> InitializeResult:
     return InitializeResult(
         protocolVersion=MCP_VERSION,
         serverInfo=SERVER_INFO,
-        capabilities=SERVER_CAPABILITIES,
+        capabilities={
+            name: support
+            for name, support in SERVER_CAPABILITIES.items()
+            if support.enabled
+        },
     )
 
 
